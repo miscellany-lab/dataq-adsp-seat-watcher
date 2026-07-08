@@ -7,6 +7,7 @@ venv/
 
 # Local runtime artifacts
 ocr_debug.txt
+ocr_debug*.txt
 *_debug.txt
 adsp_popup_hits.log
 *.log
