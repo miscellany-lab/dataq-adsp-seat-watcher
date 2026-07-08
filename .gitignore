@@ -1,0 +1,26 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Local runtime artifacts
+ocr_debug.txt
+*_debug.txt
+adsp_popup_hits.log
+*.log
+
+# Local IDE / agent state
+.vscode/
+.codex/
+.agents/
+
+# Secrets / env files
+.env
+*.env
+secrets.*
+
+# OS
+.DS_Store
+Thumbs.db
