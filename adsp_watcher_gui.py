@@ -195,22 +195,6 @@ def init_theme_system(root: tk.Misc, palette: dict[str, str]) -> ttk.Style:
     style.configure("StatusCard.TFrame", background=palette["surface"])
     style.configure("StatusValue.TLabel", font=typo["metric"], background=palette["surface"], foreground=palette["text"])
     style.configure("StatusCaption.TLabel", font=typo["caption"], background=palette["surface"], foreground=palette["muted"])
-    style.configure(
-        "Event.Treeview",
-        rowheight=token("table", "row_height"),
-        background=palette["surface"],
-        fieldbackground=palette["surface"],
-        foreground=palette["text"],
-        borderwidth=effects["border_width"],
-    )
-    style.configure(
-        "Event.Treeview.Heading",
-        font=typo["body_bold"],
-        background=palette["surface2"],
-        foreground=palette["text"],
-        relief=effects["relief_flat"],
-    )
-    style.map("Event.Treeview", background=[("selected", palette["table_selected"])])
 
     style.configure(
         "Primary.TButton",
@@ -274,6 +258,18 @@ class FieldSpec:
     secret: bool = False
 
 
+class InfoCard(ttk.Frame):
+    def __init__(self, parent: tk.Misc, title: str, body: str, palette: dict[str, str], done: bool = False) -> None:
+        super().__init__(parent, style="Card.TFrame", padding=token("layout", "card_pad"))
+        self.configure(height=token("component", "status_card_min_h"))
+        self.grid_propagate(False)
+        self.columnconfigure(0, weight=1)
+        mark = "완료" if done else "필요"
+        color = palette["good"] if done else palette["warning"]
+        ttk.Label(self, text=title, style="Section.TLabel").grid(row=0, column=0, sticky="w")
+        tk.Label(self, text=mark, bg=color, fg=token("brand", "on_accent"), padx=10, pady=4, font=token("typography", "caption")).grid(row=0, column=1, sticky="e")
+        ttk.Label(self, text=body, style="CardMuted.TLabel", wraplength=260).grid(row=1, column=0, columnspan=2, sticky="w", pady=(space("md"), 0))
+
 class WatchStatusCard(ttk.Frame):
     def __init__(self, parent: tk.Misc, title: str, value: tk.StringVar, caption: tk.StringVar) -> None:
         super().__init__(parent, style="StatusCard.TFrame", padding=token("layout", "card_pad"))
@@ -283,35 +279,6 @@ class WatchStatusCard(ttk.Frame):
         ttk.Label(self, text=title, style="StatusCaption.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(self, textvariable=value, style="StatusValue.TLabel").grid(row=1, column=0, sticky="w", pady=(space("sm"), 0))
         ttk.Label(self, textvariable=caption, style="StatusCaption.TLabel").grid(row=2, column=0, sticky="w", pady=(space("sm"), 0))
-
-
-class OCREventTable(ttk.Frame):
-    def __init__(self, parent: tk.Misc, palette: dict[str, str]) -> None:
-        super().__init__(parent, style="Card.TFrame")
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-        columns = ("time", "kind", "seat", "telegram", "evidence")
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", style="Event.Treeview", height=token("table", "event_height"))
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        for col, label, width in [
-            ("time", "시간", 96),
-            ("kind", "이벤트", 108),
-            ("seat", "좌석", 70),
-            ("telegram", "알림", 82),
-            ("evidence", "OCR 근거", 520),
-        ]:
-            self.tree.heading(col, text=label, anchor="w")
-            self.tree.column(col, width=width, minwidth=width, anchor="w", stretch=col == "evidence")
-        self.tree.tag_configure("odd", background=palette["table_odd"])
-        self.tree.tag_configure("even", background=palette["table_even"])
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-    def add_event(self, kind: str, seat: str, telegram: str, evidence: str) -> None:
-        now = time.strftime("%H:%M:%S")
-        tag = "even" if len(self.tree.get_children()) % 2 == 0 else "odd"
-        self.tree.insert("", 0, values=(now, kind, seat, telegram, evidence), tags=(tag,))
 
 
 class ToastBanner(tk.Toplevel):
@@ -417,9 +384,9 @@ class WatcherGui(tk.Tk):
         self.main.columnconfigure(0, weight=1)
         self.main.rowconfigure(3, weight=1)
         self._build_topbar(self.main)
-        self._build_kpis(self.main)
-        self._build_chart(self.main)
-        self._build_bottom(self.main)
+        self._build_readiness(self.main)
+        self._build_user_status(self.main)
+        self._build_user_controls(self.main)
 
     def _build_sidebar(self, parent: ttk.Frame) -> None:
         ttk.Label(parent, text="ADsP", style="Side.TLabel", font=token("typography", "sidebar_title")).grid(row=0, column=0, sticky="w")
@@ -434,75 +401,51 @@ class WatcherGui(tk.Tk):
         top = ttk.Frame(parent, style="Root.TFrame")
         top.grid(row=0, column=0, sticky="ew", pady=(0, 18))
         top.columnconfigure(0, weight=1)
-        ttk.Label(top, text="Monitoring Dashboard", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(top, text=f"{TARGET_EXAM} | DataQ popup OCR assistant", style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(top, text="ADsP 잔여좌석 알림 도우미", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(top, text=f"{TARGET_EXAM} | 화면 감시와 휴대폰 알림만 수행합니다", style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(6, 0))
         filters = ttk.Frame(top, style="Root.TFrame")
         filters.grid(row=0, column=1, rowspan=2, sticky="e")
-        ttk.Label(filters, text="기간", style="Muted.TLabel").grid(row=0, column=0, sticky="e", padx=(0, 8))
-        ttk.Combobox(filters, textvariable=self.period_var, values=["현재 세션", "최근 1시간", "오늘"], width=12, state="readonly").grid(row=0, column=1, padx=(0, 10))
         self.status_badge = tk.Label(filters, textvariable=self.status_var, bg=self.palette["status_bg"], fg=self.palette["status_fg"], padx=token("layout", "status_pad_x"), pady=token("layout", "status_pad_y"), font=token("typography", "body_bold"))
-        self.status_badge.grid(row=0, column=2)
+        self.status_badge.grid(row=0, column=0)
 
-    def _build_kpis(self, parent: ttk.Frame) -> None:
-        kpis = ttk.Frame(parent, style="Root.TFrame")
-        kpis.grid(row=1, column=0, sticky="ew", pady=(0, 18))
+    def _build_readiness(self, parent: ttk.Frame) -> None:
+        section = ttk.Frame(parent, style="Root.TFrame")
+        section.grid(row=1, column=0, sticky="ew", pady=(0, 18))
         for col in range(3):
-            kpis.columnconfigure(col, weight=1)
-        self._metric_card(kpis, 0, "OCR scans", self.scan_metric_var, self.scan_caption_var)
-        self._metric_card(kpis, 1, "Seat signals", self.hit_metric_var, self.hit_caption_var)
-        self._metric_card(kpis, 2, "Telegram sent", self.telegram_metric_var, self.telegram_caption_var)
+            section.columnconfigure(col, weight=1)
+        telegram_ready = bool(self.token_var.get().strip() and self.chat_id_var.get().strip())
+        InfoCard(section, "1. 휴대폰 알림", "Telegram Bot token과 Chat ID를 입력하고 테스트 전송을 합니다.", self.palette, done=telegram_ready).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        InfoCard(section, "2. DataQ 화면", "일반 Chrome에서 직접 로그인하고 고사장 목록 팝업을 맨 앞에 둡니다.", self.palette, done=False).grid(row=0, column=1, sticky="ew", padx=8)
+        running = self.process is not None and self.process.poll() is None
+        InfoCard(section, "3. 감시 시작", "준비가 끝나면 시작 버튼만 누릅니다. 실제 접수와 결제는 직접 진행합니다.", self.palette, done=running).grid(row=0, column=2, sticky="ew", padx=(8, 0))
 
+    def _build_user_status(self, parent: ttk.Frame) -> None:
+        cards = ttk.Frame(parent, style="Root.TFrame")
+        cards.grid(row=2, column=0, sticky="ew", pady=(0, 18))
+        for col in range(3):
+            cards.columnconfigure(col, weight=1)
+        self._metric_card(cards, 0, "Telegram", self.telegram_status_var, self.telegram_caption_var)
+        self._metric_card(cards, 1, "마지막 확인", self.scan_metric_var, self.scan_caption_var)
+        self._metric_card(cards, 2, "좌석 알림", self.hit_metric_var, self.hit_caption_var)
+
+    def _build_user_controls(self, parent: ttk.Frame) -> None:
+        panel = ttk.Frame(parent, style="Card.TFrame", padding=token("layout", "card_pad"))
+        panel.grid(row=3, column=0, sticky="nsew")
+        panel.columnconfigure(0, weight=1)
+        ttk.Label(panel, text="실행", style="Section.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(panel, textvariable=self.primary_message_var, style="CardMuted.TLabel", wraplength=760).grid(row=1, column=0, sticky="w", pady=(8, 22))
+        actions = ttk.Frame(panel, style="Card.TFrame")
+        actions.grid(row=2, column=0, sticky="ew")
+        self.start_button = ttk.Button(actions, text="감시 시작", style="Primary.TButton", command=self._start_watcher)
+        self.start_button.grid(row=0, column=0, sticky="w")
+        self.stop_button = ttk.Button(actions, text="중지", style="Danger.TButton", command=self._stop_watcher, state="disabled")
+        self.stop_button.grid(row=0, column=1, sticky="w", padx=(12, 0))
+        ttk.Button(actions, text="초기 설정", style="Secondary.TButton", command=self._open_setup_wizard).grid(row=0, column=2, sticky="w", padx=(12, 0))
+        ttk.Button(actions, text="Telegram 테스트", style="Secondary.TButton", command=self._test_telegram).grid(row=0, column=3, sticky="w", padx=(12, 0))
+        ttk.Label(panel, text="이 도구는 화면 감시와 알림만 수행합니다. 접수, 결제, 로그인, 캡차 처리는 사용자가 직접 합니다.", style="CardMuted.TLabel", wraplength=760).grid(row=3, column=0, sticky="w", pady=(28, 0))
     def _metric_card(self, parent: ttk.Frame, col: int, title: str, value: tk.StringVar, caption: tk.StringVar) -> None:
         card = WatchStatusCard(parent, title, value, caption)
         card.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0 if col == 2 else 8))
-
-    def _build_chart(self, parent: ttk.Frame) -> None:
-        panel = ttk.Frame(parent, style="Card.TFrame", padding=token("layout", "card_pad"))
-        panel.grid(row=2, column=0, sticky="ew", pady=(0, 18))
-        panel.columnconfigure(0, weight=1)
-        header = ttk.Frame(panel, style="Card.TFrame")
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="실시간 감지 트래픽", style="Section.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, textvariable=self.summary_var, style="CardMuted.TLabel").grid(row=0, column=1, sticky="e")
-        self.chart = tk.Canvas(panel, height=token("layout", "chart_height"), bg=self.palette["surface"], highlightthickness=token("effects", "highlight_none"))
-        self.chart.grid(row=1, column=0, sticky="ew")
-        self.chart.bind("<Configure>", lambda _event: self._draw_chart())
-
-    def _build_bottom(self, parent: ttk.Frame) -> None:
-        bottom = ttk.Frame(parent, style="Root.TFrame")
-        bottom.grid(row=3, column=0, sticky="nsew")
-        bottom.columnconfigure(0, weight=0)
-        bottom.columnconfigure(1, weight=1)
-        bottom.rowconfigure(0, weight=1)
-
-        actions = ttk.Frame(bottom, style="Card.TFrame", padding=token("layout", "card_pad"))
-        actions.grid(row=0, column=0, sticky="nsw", padx=(0, 18))
-        ttk.Label(actions, text="Quick actions", style="Section.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 12))
-        ttk.Button(actions, text="초기 설정", style="Secondary.TButton", command=self._open_setup_wizard).grid(row=1, column=0, sticky="ew", pady=5)
-        ttk.Button(actions, text="DataQ 열기", style="Secondary.TButton", command=lambda: webbrowser.open(DATAQ_ACCEPT_URL)).grid(row=2, column=0, sticky="ew", pady=5)
-        ttk.Button(actions, text="Telegram 테스트", style="Secondary.TButton", command=self._test_telegram).grid(row=3, column=0, sticky="ew", pady=5)
-        self.start_button = ttk.Button(actions, text="감시 시작", style="Primary.TButton", command=self._start_watcher)
-        self.start_button.grid(row=4, column=0, sticky="ew", pady=(18, 5))
-        self.stop_button = ttk.Button(actions, text="중지", style="Danger.TButton", command=self._stop_watcher, state="disabled")
-        self.stop_button.grid(row=5, column=0, sticky="ew", pady=5)
-        ttk.Label(actions, text="자동 접수/결제 없음", style="CardMuted.TLabel").grid(row=6, column=0, sticky="w", pady=(18, 0))
-
-        logs = ttk.Frame(bottom, style="Card.TFrame", padding=token("layout", "card_pad"))
-        logs.grid(row=0, column=1, sticky="nsew")
-        logs.columnconfigure(0, weight=1)
-        logs.rowconfigure(2, weight=1)
-        logs.rowconfigure(3, weight=1)
-        log_header = ttk.Frame(logs, style="Card.TFrame")
-        log_header.grid(row=0, column=0, sticky="ew")
-        log_header.columnconfigure(0, weight=1)
-        ttk.Label(log_header, text="OCR 이벤트 검증", style="Section.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Button(log_header, text="명령 복사", style="Secondary.TButton", command=self._copy_command).grid(row=0, column=1, sticky="e")
-        ttk.Entry(logs, textvariable=self.command_var, state="readonly").grid(row=1, column=0, sticky="ew", pady=(12, 12))
-        self.event_table = OCREventTable(logs, self.palette)
-        self.event_table.grid(row=2, column=0, sticky="nsew", pady=(0, 12))
-        self.output_text = tk.Text(logs, wrap="word", height=token("layout", "log_height"), font=token("typography", "log"), bg=self.palette["log_bg"], fg=self.palette["log_fg"], insertbackground=self.palette["log_fg"], relief=token("effects", "relief_flat"), padx=14, pady=14)
-        self.output_text.grid(row=3, column=0, sticky="nsew")
 
     def _toggle_theme(self) -> None:
         self._apply_palette()
@@ -511,13 +454,18 @@ class WatcherGui(tk.Tk):
             child.destroy()
         self._build_ui()
         self._refresh_all()
-        self._draw_chart()
 
     def _refresh_summary(self) -> None:
-        self.scan_metric_var.set(str(self.scan_count))
+        telegram_ready = bool(self.token_var.get().strip() and self.chat_id_var.get().strip())
+        self.telegram_status_var.set("준비됨" if telegram_ready else "미설정")
+        if telegram_ready and self.telegram_caption_var.get() in {"알림 대기", "Bot token과 Chat ID가 필요합니다"}:
+            self.telegram_caption_var.set("테스트 전송을 해보세요")
+        elif not telegram_ready:
+            self.telegram_caption_var.set("Bot token과 Chat ID가 필요합니다")
+        self.scan_metric_var.set(time.strftime("%H:%M:%S") if self.scan_count else "아직 없음")
         self.hit_metric_var.set(str(self.hit_count))
         self.telegram_metric_var.set(str(self.telegram_count))
-        telegram = "Telegram 설정됨" if self.token_var.get().strip() and self.chat_id_var.get().strip() else "Telegram 미설정"
+        telegram = "Telegram 설정됨" if telegram_ready else "Telegram 미설정"
         self.summary_var.set(f"{telegram} | {self.interval_var.get().strip() or DEFAULT_INTERVAL}초 주기 | {self.pages_var.get().strip() or DEFAULT_PAGES}화면")
 
     def _open_setup_wizard(self) -> None:
@@ -598,55 +546,44 @@ class WatcherGui(tk.Tk):
     def _refresh_all(self) -> None:
         self._refresh_command_preview()
         self._refresh_summary()
-        self._draw_chart()
 
     def _show_toast(self, message: str, danger: bool = False) -> None:
         ToastBanner(self, message, self.palette, danger=danger)
 
-    def _add_event(self, kind: str, seat: str, telegram: str, evidence: str) -> None:
-        if hasattr(self, "event_table"):
-            self.event_table.add_event(kind, seat, telegram, evidence)
-
     def _parse_runtime_event(self, text: str) -> None:
         if "팝업 OCR 확인" in text:
             self.scan_count += 1
-            self.scan_caption_var.set(time.strftime("마지막 스캔 %H:%M:%S"))
-            self._push_chart_value(0)
+            self.scan_caption_var.set(time.strftime("마지막 확인 %H:%M:%S"))
             match = re.search(r"팝업 OCR 확인:\s*(\d+)건", text)
             if match and int(match.group(1)) > 0:
-                self._add_event("OCR 후보", match.group(1), "확인 필요", text.strip())
+                self.scan_caption_var.set("좌석 후보를 확인하는 중")
 
-        seat_match = re.search(r"OCR No\.(\d+)\s+잔여좌석\s+(\d+)석\s+-\s+(.+)", text)
+        seat_match = re.search(r"OCR No\.(\d+)\s+잔여좌석\s+(\d+)석", text)
         if seat_match:
-            no, seats, evidence = seat_match.groups()
-            self._add_event(f"No.{no}", f"{seats}석", "전송 대기", evidence.strip())
-            self.hit_caption_var.set(f"No.{no} / {seats}석 후보")
-            self._show_toast(f"ADsP 잔여좌석 후보 감지\nNo.{no} / {seats}석")
-
-        seat_column_match = re.search(r"OCR seat column page\s+(\d+)\s+잔여좌석\s+(\d+)석\s+-\s+(.+)", text)
-        if seat_column_match:
-            page, seats, evidence = seat_column_match.groups()
-            self._add_event(f"좌석열 p{page}", f"{seats}석", "보조 OCR", evidence.strip())
-
-        if "ADsP 잔여좌석 발견" in text:
+            no, seats = seat_match.groups()
             self.hit_count += 1
-            self._push_chart_value(1)
+            self.hit_metric_var.set(str(self.hit_count))
+            self.hit_caption_var.set(f"No.{no} 고사장 / {seats}석")
+            self.primary_message_var.set("잔여좌석 가능성이 감지되었습니다. 휴대폰 알림과 DataQ 화면을 확인하세요.")
+            self._show_toast(f"잔여좌석 가능성 감지\nNo.{no} / {seats}석")
+
+        if "ADsP 잔여좌석 발견" in text and not seat_match:
+            self.hit_count += 1
+            self.hit_metric_var.set(str(self.hit_count))
+            self.primary_message_var.set("잔여좌석 가능성이 감지되었습니다. 휴대폰 알림과 DataQ 화면을 확인하세요.")
 
         if "Telegram 알림 전송 완료" in text:
             self.telegram_count += 1
-            self.telegram_caption_var.set(time.strftime("마지막 전송 %H:%M:%S"))
-            self._add_event("Telegram", "-", "전송 완료", text.strip())
-            self._show_toast("Telegram 알림 전송 완료")
+            self.telegram_caption_var.set("알림 전송 완료")
+            self._show_toast("휴대폰 알림을 보냈습니다")
 
         if "Telegram 테스트 전송 완료" in text:
             self.telegram_caption_var.set("테스트 성공")
-            self._add_event("Telegram", "-", "테스트 성공", text.strip())
             self._show_toast("Telegram 테스트 전송 완료")
 
         if "Telegram 알림 실패" in text or "Telegram 테스트 전송 실패" in text:
             self.telegram_caption_var.set("전송 실패")
-            self._add_event("Telegram", "-", "실패", text.strip())
-            self._show_toast("Telegram 알림 실패", danger=True)
+            self._show_toast("Telegram 전송에 실패했습니다", danger=True)
 
     def _build_command(self) -> list[str]:
         cmd = [sys.executable, "adsp_popup_ocr_watcher.py", "--interval", self.interval_var.get().strip() or DEFAULT_INTERVAL, "--pages", self.pages_var.get().strip() or DEFAULT_PAGES, "--scroll-method", "wheel", "--wheel-notches", self.wheel_notches_var.get().strip() or DEFAULT_WHEEL_NOTCHES, "--focus-click", self.focus_click_var.get().strip() or DEFAULT_FOCUS_CLICK, "--bbox", self.bbox_var.get().strip() or DEFAULT_BBOX, "--save-text", self.save_text_var.get().strip() or DEFAULT_SAVE_TEXT]
@@ -670,38 +607,18 @@ class WatcherGui(tk.Tk):
         cmd = self._build_command()
         self.command_var.set(" ".join(f'"{part}"' if " " in part else part for part in cmd))
 
+    def _remember_log(self, text: str) -> None:
+        self.debug_lines.append(text)
+        if len(self.debug_lines) > 1200:
+            self.debug_lines = self.debug_lines[-1200:]
+        if self.debug_text is not None and self.debug_text.winfo_exists():
+            self.debug_text.insert("end", text)
+            self.debug_text.see("end")
+
     def _append_output(self, text: str) -> None:
-        self.output_text.insert("end", text)
-        self.output_text.see("end")
+        self._remember_log(text)
         self._parse_runtime_event(text)
         self._refresh_summary()
-
-    def _push_chart_value(self, value: int) -> None:
-        self.event_buckets = self.event_buckets[1:] + [value]
-        self._draw_chart()
-
-    def _draw_chart(self) -> None:
-        if not hasattr(self, "chart"):
-            return
-        self.chart.delete("all")
-        width = max(1, self.chart.winfo_width())
-        height = max(1, self.chart.winfo_height())
-        p = self.palette
-        self.chart.configure(bg=p["surface"])
-        pad = token("layout", "chart_pad")
-        inner_w = width - pad * 2
-        inner_h = height - pad * 2
-        self.chart.create_line(pad, height - pad, width - pad, height - pad, fill=p["line"])
-        self.chart.create_line(pad, pad, pad, height - pad, fill=p["line"])
-        max_value = max(1, max(self.event_buckets))
-        bar_w = max(4, inner_w / len(self.event_buckets) * 0.56)
-        gap = inner_w / len(self.event_buckets)
-        for idx, value in enumerate(self.event_buckets):
-            x = pad + idx * gap + gap * 0.22
-            bar_h = (value / max_value) * (inner_h - 8)
-            color = token("brand", "accent") if value else p["surface2"]
-            self.chart.create_rectangle(x, height - pad - bar_h, x + bar_w, height - pad, fill=color, outline="")
-        self.chart.create_text(pad, pad - 2, anchor="nw", text="seat signal timeline", fill=p["muted"], font=("Pretendard", 9))
 
     def _test_telegram(self) -> None:
         token = self.token_var.get().strip()
@@ -734,7 +651,7 @@ class WatcherGui(tk.Tk):
             env["TELEGRAM_BOT_TOKEN"] = token
         if chat_id:
             env["TELEGRAM_CHAT_ID"] = chat_id
-        self.output_text.delete("1.0", "end")
+        self.debug_lines.clear()
         self._append_output("실행 시작\n")
         self._append_output(self.command_var.get() + "\n\n")
         self.process = subprocess.Popen(self._build_command(), cwd=Path(__file__).resolve().parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env=env)
@@ -776,6 +693,34 @@ class WatcherGui(tk.Tk):
             pass
         self.after(150, self._drain_output_queue)
 
+    def _open_debug_log(self) -> None:
+        if self.debug_window is not None and self.debug_window.winfo_exists():
+            self.debug_window.lift()
+            return
+        window = tk.Toplevel(self)
+        self.debug_window = window
+        window.title(f"{APP_TITLE} - 문제 해결 로그")
+        window.geometry("760x520")
+        window.configure(bg=self.palette["bg"])
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(1, weight=1)
+        header = ttk.Frame(window, style="Root.TFrame", padding=(18, 16, 18, 8))
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text="문제 해결 로그", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Button(header, text="명령 복사", style="Secondary.TButton", command=self._copy_command).grid(row=0, column=1, sticky="e")
+        text = tk.Text(window, wrap="word", height=token("layout", "log_height"), font=token("typography", "log"), bg=self.palette["log_bg"], fg=self.palette["log_fg"], insertbackground=self.palette["log_fg"], relief=token("effects", "relief_flat"), padx=14, pady=14)
+        text.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
+        self.debug_text = text
+        text.insert("end", "".join(self.debug_lines) or "아직 로그가 없습니다.\n")
+        text.see("end")
+        window.protocol("WM_DELETE_WINDOW", self._close_debug_log)
+
+    def _close_debug_log(self) -> None:
+        if self.debug_window is not None and self.debug_window.winfo_exists():
+            self.debug_window.destroy()
+        self.debug_window = None
+        self.debug_text = None
     def _copy_command(self) -> None:
         self.clipboard_clear()
         self.clipboard_append(self.command_var.get())

@@ -109,15 +109,16 @@ python adsp_watcher_gui.py
 
 GUI에서 할 수 있는 일:
 
-- 좌측 네비게이션과 상단 기간 필터가 있는 대시보드형 화면
-- OCR scans, Seat signals, Telegram sent 3개 KPI 카드
-- 감지 이벤트 흐름을 보여주는 실시간 차트
-- Telegram Bot token과 chat_id를 별도 설정 창에서 입력
-- DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별로 설정
+- 일반 사용자가 바로 이해할 수 있는 시작 준비 화면
+- Telegram 알림, DataQ 화면 준비, 감시 시작 여부를 단계별 카드로 확인
+- 감시 시작/중지, Telegram 테스트, DataQ 열기를 버튼으로 실행
+- OCR 원문, 후보 테이블, CLI 명령어 같은 개발자 정보는 기본 화면에서 숨김
+- 문제가 생겼을 때만 `문제 해결 로그` 창에서 내부 로그와 실행 명령 확인
+- DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별 설정 창에서 조정
 - 다크모드 토글
-- `DESIGN_TOKENS`와 `init_theme_system()` 기반의 데이터 주도형 테마 엔진
-- 현재 설정으로 생성되는 CLI 명령 확인 및 복사
-- 감시 시작/중지와 실시간 로그 확인
+- `DESIGN_TOKENS`와 `init_theme_system()` 기반의 사용자용 테마 엔진
+
+개발자/운영 검증용 상세 로그와 OCR 후보 검증은 CLI(`adsp_popup_ocr_watcher.py`)를 직접 실행해 확인합니다.
 
 Bot token과 chat_id는 프로그램 실행 중 환경변수로만 전달되며, 파일에 저장하지 않습니다.
 
