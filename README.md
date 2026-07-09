@@ -101,7 +101,7 @@ winget install Python.Python.3.12
 
 ## GUI 실행
 
-명령어 옵션을 직접 조합하지 않고, 대시보드형 GUI에서 상태를 보며 단계별 설정을 끝낸 뒤 실행하려면 GUI를 사용합니다.
+명령어 옵션을 직접 조합하지 않고, 일반 사용자용 GUI에서 준비 절차를 따라 설정한 뒤 실행하려면 GUI를 사용합니다.
 
 ```powershell
 python adsp_watcher_gui.py
