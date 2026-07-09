@@ -6,6 +6,7 @@ experience to a small HTML/CSS interface rendered by pywebview.
 from __future__ import annotations
 
 import os
+import json
 import queue
 import re
 import signal
@@ -49,6 +50,14 @@ class WatcherConfig:
     seat_column: bool = True
     clipboard_assist: bool = True
 
+
+
+def _result_sort_key(item: dict[str, str]) -> tuple[int, str]:
+    try:
+        row_number = int(item.get("no") or 999999)
+    except (TypeError, ValueError):
+        row_number = 999999
+    return row_number, str(item.get("site") or "")
 
 class WatcherApi:
     def __init__(self) -> None:
@@ -159,7 +168,7 @@ class WatcherApi:
             "running": running,
             "startedAt": self.last_started_at,
             "events": items,
-            "results": self.results[-120:],
+            "results": sorted(self.results[-120:], key=_result_sort_key),
             "log": "".join(self.log_lines[-500:]),
         }
 
@@ -181,6 +190,7 @@ class WatcherApi:
             cfg.bbox,
             "--save-text",
             cfg.save_text,
+            "--gui-events",
         ]
         if cfg.refresh:
             cmd.append("--refresh")
@@ -212,6 +222,9 @@ class WatcherApi:
     def _classify_line(self, line: str) -> None:
         if not line:
             return
+        if line.startswith("ADSP_WATCHER_RESULT_JSON "):
+            self._consume_json_event(line)
+            return
         self._consume_result_line(line)
 
         kind = "log"
@@ -227,6 +240,50 @@ class WatcherApi:
             kind = "telegram"
         self._emit(kind, line)
 
+    def _consume_json_event(self, line: str) -> None:
+        raw_payload = line.removeprefix("ADSP_WATCHER_RESULT_JSON ").strip()
+        try:
+            payload = json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            self._emit("error", f"GUI 결과 이벤트 파싱 실패: {exc}")
+            return
+        if payload.get("type") != "seat_hits":
+            return
+        known = {
+            (item.get("no"), item.get("seats"), item.get("site"), item.get("address"))
+            for item in self.results
+        }
+        event_time = payload.get("time") or datetime.now().strftime("%H:%M:%S")
+        added = 0
+        for hit in payload.get("hits", []):
+            item = self._result_from_hit_payload(hit, event_time)
+            key = (item["no"], item["seats"], item["site"], item["address"])
+            if key in known:
+                continue
+            known.add(key)
+            self.results.append(item)
+            added += 1
+        self.results = self.results[-200:]
+        self._emit("result", f"잔여좌석 결과 {added}건 반영")
+
+    def _result_from_hit_payload(self, hit: dict, event_time: str) -> dict[str, str]:
+        line = str(hit.get("line") or "")
+        site = str(hit.get("site") or "").strip()
+        address = str(hit.get("address") or "").strip()
+        if not site and " - " in line:
+            parts = [part.strip() for part in line.split(" - ")]
+            if len(parts) >= 3:
+                site = parts[2]
+            if len(parts) >= 4:
+                address = parts[3]
+        return {
+            "time": str(event_time).split()[-1],
+            "no": "" if hit.get("no") is None else str(hit.get("no")),
+            "region": str(hit.get("region") or ""),
+            "seats": str(hit.get("seats") or ""),
+            "site": site or line,
+            "address": address,
+        }
     def _consume_result_line(self, line: str) -> None:
         if line.startswith("ADsP 잔여좌석 발견"):
             self._flush_pending_result()

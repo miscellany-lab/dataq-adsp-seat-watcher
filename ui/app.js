@@ -182,7 +182,7 @@ function renderResults() {
     return;
   }
 
-  state.results.slice().reverse().forEach((result) => {
+  state.results.slice().sort(compareResultByNo).forEach((result) => {
     const item = document.createElement('article');
     item.className = 'seat-result';
     item.innerHTML = `
@@ -198,6 +198,15 @@ function renderResults() {
   });
 }
 
+
+function compareResultByNo(a, b) {
+  const aNo = Number.parseInt(a.no, 10);
+  const bNo = Number.parseInt(b.no, 10);
+  if (Number.isFinite(aNo) && Number.isFinite(bNo) && aNo !== bNo) {
+    return aNo - bNo;
+  }
+  return String(a.no || '').localeCompare(String(b.no || ''), 'ko');
+}
 async function poll() {
   if (!bridgeReady()) return;
   const result = await window.pywebview.api.poll();

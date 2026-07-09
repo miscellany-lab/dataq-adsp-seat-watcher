@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import json
 import os
 import re
 import shutil
@@ -439,6 +440,7 @@ def main() -> int:
     parser.add_argument("--telegram-token", default=None, help="Telegram Bot token")
     parser.add_argument("--telegram-chat-id", default=None, help="Telegram chat_id")
     parser.add_argument("--telegram-test", action="store_true", help="시작 시 Telegram 테스트 메시지를 1회 전송합니다.")
+    parser.add_argument("--gui-events", action="store_true", help="GUI가 읽을 수 있는 ASCII JSON 결과 이벤트를 stdout에 함께 출력합니다.")
     args = parser.parse_args()
 
     if args.auto_copy_clipboard:
@@ -478,10 +480,28 @@ def main() -> int:
             return
         message = f"ADsP 잔여좌석 발견 ({len(found_hits)}건)\n\n" + "\n\n".join(lines)
         append_log(args.log_file, f"[{event_time}]\n{message}\n")
+        if args.gui_events:
+            payload = {
+                "type": "seat_hits",
+                "time": event_time,
+                "count": len(found_hits),
+                "hits": [
+                    {
+                        "no": hit.no,
+                        "region": hit.region,
+                        "seats": hit.seats,
+                        "site": hit.site_name,
+                        "address": hit.address,
+                        "line": hit.line,
+                        "source": hit.source,
+                    }
+                    for hit in found_hits
+                ],
+            }
+            print("ADSP_WATCHER_RESULT_JSON " + json.dumps(payload, ensure_ascii=True), flush=True)
         alert(message, args.message_box)
         send_telegram(args.telegram_token, args.telegram_chat_id, message)
         last_alert_key = alert_key
-
     while True:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
