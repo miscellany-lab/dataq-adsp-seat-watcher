@@ -1,3 +1,4 @@
 playwright
 pillow
 pytesseract
+customtkinter

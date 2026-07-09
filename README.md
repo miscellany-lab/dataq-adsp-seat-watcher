@@ -101,7 +101,7 @@ winget install Python.Python.3.12
 
 ## GUI 실행
 
-명령어 옵션을 직접 조합하지 않고, 일반 사용자용 GUI에서 준비 절차를 따라 설정한 뒤 실행하려면 GUI를 사용합니다.
+명령어 옵션을 직접 조합하지 않고, 일반 사용자용 GUI에서 준비 절차를 따라 설정한 뒤 실행하려면 GUI를 사용합니다. GUI는 CustomTkinter 기반이며, 설치 명령에서 필요한 패키지가 함께 설치됩니다.
 
 ```powershell
 python adsp_watcher_gui.py
@@ -116,6 +116,8 @@ GUI에서 할 수 있는 일:
 - 문제가 생겼을 때만 `문제 해결 로그` 창에서 내부 로그와 실행 명령 확인
 - DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별 설정 창에서 조정
 - 다크모드 토글
+- CustomTkinter 기반의 모던 UI와 단계별 설정 창
+- `themes/adsp_customtkinter_theme.json`으로 관리되는 라이트/다크 테마
 - `DESIGN_TOKENS`와 `init_theme_system()` 기반의 사용자용 테마 엔진
 
 개발자/운영 검증용 상세 로그와 OCR 후보 검증은 CLI(`adsp_popup_ocr_watcher.py`)를 직접 실행해 확인합니다.
@@ -202,12 +204,13 @@ OCR은 완벽하지 않습니다. 실제 접수 가능 여부는 사용자가 Da
 
 ## 파일 구성
 
-- `adsp_watcher_gui.py`: 설정, Telegram 테스트, 실행/중지를 제공하는 GUI
+- `adsp_watcher_gui.py`: 설정, Telegram 테스트, 실행/중지를 제공하는 CustomTkinter GUI
 - `adsp_popup_ocr_watcher.py`: 팝업 OCR 감시, 선택적 새로고침, Telegram 알림
 - `adsp_ocr_watcher.py`: 일반 화면 OCR 감시
 - `adsp_manual_clipboard_watcher.py`: 수동 클립보드 텍스트 감시
 - `adsp_seat_parser.py`: 좌석 파싱 로직
 - `adsp_seat_watcher.py`: Playwright 방식 비권장 안내
+- `themes/adsp_customtkinter_theme.json`: GUI 테마 설정
 - `requirements.txt`: Python 패키지 목록
 
 ## 배포 전 체크리스트
