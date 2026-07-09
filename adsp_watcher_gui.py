@@ -139,6 +139,92 @@ def mode_palette(is_dark: bool) -> dict[str, str]:
     return token("palette", mode_name(is_dark)).copy()
 
 
+def init_theme_system(root: tk.Misc, palette: dict[str, str]) -> ttk.Style:
+    """
+    Data-driven ttk style matrix.
+
+    All reusable ttk styles must be derived from DESIGN_TOKENS. When the UI
+    needs a new visual state or component variant, extend DESIGN_TOKENS first
+    and then map it here.
+    """
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    typo = token("typography")
+    spacing = token("space")
+    effects = token("effects")
+    brand = token("brand")
+
+    style.configure(".", font=typo["body"], background=palette["bg"], foreground=palette["text"])
+    style.configure("Root.TFrame", background=palette["bg"])
+    style.configure("Sidebar.TFrame", background=palette["sidebar"])
+    style.configure("Card.TFrame", background=palette["surface"])
+    style.configure("Soft.TFrame", background=palette["surface2"])
+
+    style.configure("TLabel", background=palette["bg"], foreground=palette["text"])
+    style.configure("Muted.TLabel", background=palette["bg"], foreground=palette["muted"])
+    style.configure("Side.TLabel", background=palette["sidebar"], foreground=palette["text"])
+    style.configure("SideMuted.TLabel", background=palette["sidebar"], foreground=palette["muted"])
+    style.configure("Card.TLabel", background=palette["surface"], foreground=palette["text"])
+    style.configure("CardMuted.TLabel", background=palette["surface"], foreground=palette["muted"])
+    style.configure("Soft.TLabel", background=palette["surface2"], foreground=palette["text"])
+    style.configure("Title.TLabel", font=typo["title"], background=palette["bg"], foreground=palette["text"])
+    style.configure("Section.TLabel", font=typo["section"], background=palette["surface"], foreground=palette["text"])
+    style.configure("Metric.TLabel", font=typo["metric"], background=palette["surface"], foreground=palette["text"])
+
+    style.configure(
+        "Primary.TButton",
+        padding=(spacing["xl"], spacing["lg"]),
+        background=brand["accent"],
+        foreground=brand["on_accent"],
+        borderwidth=effects["border_width"],
+    )
+    style.map(
+        "Primary.TButton",
+        background=[("active", brand["accent_hover"]), ("disabled", brand["accent_disabled"])],
+        foreground=[("disabled", brand["on_accent"])],
+    )
+    style.configure(
+        "Secondary.TButton",
+        padding=(spacing["xl"], spacing["md"] + 1),
+        background=palette["surface2"],
+        foreground=brand["accent"],
+        borderwidth=effects["border_width"],
+    )
+    style.configure(
+        "Ghost.TButton",
+        padding=(spacing["lg"], spacing["md"]),
+        background=palette["sidebar"],
+        foreground=palette["muted"],
+        borderwidth=effects["border_width"],
+    )
+    style.configure(
+        "Danger.TButton",
+        padding=(spacing["xl"], spacing["md"] + 1),
+        background=palette["surface2"],
+        foreground=palette["danger"],
+        borderwidth=effects["border_width"],
+    )
+
+    style.configure(
+        "TEntry",
+        padding=(spacing["lg"], spacing["md"] - 1),
+        fieldbackground=palette["surface2"],
+        foreground=palette["text"],
+        bordercolor=palette["line"],
+        lightcolor=palette["line"],
+        darkcolor=palette["line"],
+    )
+    style.configure(
+        "TCombobox",
+        padding=(spacing["md"], spacing["md"] - 1),
+        fieldbackground=palette["surface2"],
+        foreground=palette["text"],
+        bordercolor=palette["line"],
+    )
+    style.configure("TCheckbutton", background=palette["surface"], foreground=palette["text"])
+    return style
+
+
 @dataclass
 class FieldSpec:
     label: str
@@ -201,36 +287,7 @@ class WatcherGui(tk.Tk):
         self.palette = mode_palette(self.dark_mode_var.get())
 
     def _configure_style(self) -> None:
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        p = self.palette
-        typo = token("typography")
-        space = token("space")
-        effects = token("effects")
-        brand = token("brand")
-        style.configure(".", font=typo["body"], background=p["bg"], foreground=p["text"])
-        style.configure("Root.TFrame", background=p["bg"])
-        style.configure("Sidebar.TFrame", background=p["sidebar"])
-        style.configure("Card.TFrame", background=p["surface"])
-        style.configure("Soft.TFrame", background=p["surface2"])
-        style.configure("TLabel", background=p["bg"], foreground=p["text"])
-        style.configure("Muted.TLabel", background=p["bg"], foreground=p["muted"])
-        style.configure("Side.TLabel", background=p["sidebar"], foreground=p["text"])
-        style.configure("SideMuted.TLabel", background=p["sidebar"], foreground=p["muted"])
-        style.configure("Card.TLabel", background=p["surface"], foreground=p["text"])
-        style.configure("CardMuted.TLabel", background=p["surface"], foreground=p["muted"])
-        style.configure("Soft.TLabel", background=p["surface2"], foreground=p["text"])
-        style.configure("Title.TLabel", font=typo["title"], background=p["bg"], foreground=p["text"])
-        style.configure("Section.TLabel", font=typo["section"], background=p["surface"], foreground=p["text"])
-        style.configure("Metric.TLabel", font=typo["metric"], background=p["surface"], foreground=p["text"])
-        style.configure("Primary.TButton", padding=(space["xl"], space["lg"]), background=brand["accent"], foreground=brand["on_accent"], borderwidth=effects["border_width"])
-        style.map("Primary.TButton", background=[("active", brand["accent_hover"]), ("disabled", brand["accent_disabled"])])
-        style.configure("Secondary.TButton", padding=(space["xl"], space["md"] + 1), background=p["surface2"], foreground=brand["accent"], borderwidth=effects["border_width"])
-        style.configure("Ghost.TButton", padding=(space["lg"], space["md"]), background=p["sidebar"], foreground=p["muted"], borderwidth=effects["border_width"])
-        style.configure("Danger.TButton", padding=(space["xl"], space["md"] + 1), background=p["surface2"], foreground=p["danger"], borderwidth=effects["border_width"])
-        style.configure("TEntry", padding=(space["lg"], space["md"] - 1), fieldbackground=p["surface2"], foreground=p["text"], bordercolor=p["line"], lightcolor=p["line"], darkcolor=p["line"])
-        style.configure("TCombobox", padding=(space["md"], space["md"] - 1), fieldbackground=p["surface2"], foreground=p["text"], bordercolor=p["line"])
-        style.configure("TCheckbutton", background=p["surface"], foreground=p["text"])
+        self.theme = init_theme_system(self, self.palette)
 
     def _build_ui(self) -> None:
         self.configure(bg=self.palette["bg"])

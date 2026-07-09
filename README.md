@@ -115,7 +115,7 @@ GUI에서 할 수 있는 일:
 - Telegram Bot token과 chat_id를 별도 설정 창에서 입력
 - DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별로 설정
 - 다크모드 토글
-- `DESIGN_TOKENS` 기반의 데이터 주도형 테마 엔진
+- `DESIGN_TOKENS`와 `init_theme_system()` 기반의 데이터 주도형 테마 엔진
 - 현재 설정으로 생성되는 CLI 명령 확인 및 복사
 - 감시 시작/중지와 실시간 로그 확인
 
