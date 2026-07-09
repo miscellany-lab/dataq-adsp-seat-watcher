@@ -132,26 +132,27 @@ def alert(message: str, show_message_box: bool = False) -> None:
         threading.Thread(target=show_message, daemon=True).start()
 
 
-def send_telegram(token: str | None, chat_id: str | None, message: str) -> None:
+def send_telegram(token: str | None, chat_id: str | None, message: str) -> bool:
     if not token or not chat_id:
-        return
+        print("Telegram 알림 건너뜀: TELEGRAM_BOT_TOKEN 또는 TELEGRAM_CHAT_ID가 없습니다.", flush=True)
+        return False
 
-    def send() -> None:
-        data = urllib.parse.urlencode(
-            {
-                "chat_id": chat_id,
-                "text": message[:3500],
-                "disable_web_page_preview": "true",
-            }
-        ).encode("utf-8")
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        try:
-            with urllib.request.urlopen(url, data=data, timeout=10) as response:
-                response.read()
-        except Exception as exc:
-            print(f"Telegram 알림 실패: {exc}")
-
-    threading.Thread(target=send, daemon=True).start()
+    data = urllib.parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "text": message[:3500],
+            "disable_web_page_preview": "true",
+        }
+    ).encode("utf-8")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        with urllib.request.urlopen(url, data=data, timeout=10) as response:
+            response.read()
+        print("Telegram 알림 전송 완료", flush=True)
+        return True
+    except Exception as exc:
+        print(f"Telegram 알림 실패: {exc}", flush=True)
+        return False
 
 
 def keep_awake(enable: bool) -> None:
@@ -352,6 +353,7 @@ def main() -> int:
     )
     parser.add_argument("--telegram-token", default=None, help="Telegram Bot token")
     parser.add_argument("--telegram-chat-id", default=None, help="Telegram chat_id")
+    parser.add_argument("--telegram-test", action="store_true", help="시작 시 Telegram 테스트 메시지를 1회 전송합니다.")
     args = parser.parse_args()
 
     if not args.telegram_token:
@@ -369,6 +371,11 @@ def main() -> int:
     print(f"확인 주기: {args.interval}초")
     print(f"스캔 화면 수: {max(1, args.pages)}")
     print(f"OCR 영역: {args.bbox or '전체 화면'}")
+    telegram_ready = bool(args.telegram_token and args.telegram_chat_id)
+    print(f"Telegram 알림: {'사용' if telegram_ready else '미설정'}")
+    if args.telegram_test:
+        test_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        send_telegram(args.telegram_token, args.telegram_chat_id, f"ADsP watcher Telegram test\n시간: {test_now}")
 
     last_alert_key = ""
     cycle_alert_sent = False
@@ -440,6 +447,8 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
 
 
 
