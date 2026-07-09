@@ -57,6 +57,9 @@ DESIGN_TOKENS = {
             "running_bg": "#063B2F",
             "running_fg": "#9FF4DF",
             "log_fg": "#E5E7EB",
+            "table_odd": "#121A2B",
+            "table_even": "#172033",
+            "table_selected": "#102A5C",
         },
         "light": {
             "bg": "#F7F9FC",
@@ -74,6 +77,9 @@ DESIGN_TOKENS = {
             "running_bg": "#E6F8F1",
             "running_fg": "#008F6B",
             "log_fg": "#E5E7EB",
+            "table_odd": "#FFFFFF",
+            "table_even": "#F7F9FC",
+            "table_selected": "#EAF2FF",
         },
     },
     "typography": {
@@ -111,6 +117,22 @@ DESIGN_TOKENS = {
         "log_height": 14,
         "status_pad_x": 14,
         "status_pad_y": 8,
+    },
+    "component": {
+        "status_card_min_h": 92,
+        "status_chip_pad": (10, 5),
+    },
+    "table": {
+        "row_height": 32,
+        "heading_height": 36,
+        "event_height": 7,
+    },
+    "toast": {
+        "width": 420,
+        "height": 64,
+        "duration_ms": 3200,
+        "pad": 16,
+        "offset": 24,
     },
     "effects": {
         "border_width": 0,
@@ -170,6 +192,25 @@ def init_theme_system(root: tk.Misc, palette: dict[str, str]) -> ttk.Style:
     style.configure("Title.TLabel", font=typo["title"], background=palette["bg"], foreground=palette["text"])
     style.configure("Section.TLabel", font=typo["section"], background=palette["surface"], foreground=palette["text"])
     style.configure("Metric.TLabel", font=typo["metric"], background=palette["surface"], foreground=palette["text"])
+    style.configure("StatusCard.TFrame", background=palette["surface"])
+    style.configure("StatusValue.TLabel", font=typo["metric"], background=palette["surface"], foreground=palette["text"])
+    style.configure("StatusCaption.TLabel", font=typo["caption"], background=palette["surface"], foreground=palette["muted"])
+    style.configure(
+        "Event.Treeview",
+        rowheight=token("table", "row_height"),
+        background=palette["surface"],
+        fieldbackground=palette["surface"],
+        foreground=palette["text"],
+        borderwidth=effects["border_width"],
+    )
+    style.configure(
+        "Event.Treeview.Heading",
+        font=typo["body_bold"],
+        background=palette["surface2"],
+        foreground=palette["text"],
+        relief=effects["relief_flat"],
+    )
+    style.map("Event.Treeview", background=[("selected", palette["table_selected"])])
 
     style.configure(
         "Primary.TButton",
@@ -233,6 +274,75 @@ class FieldSpec:
     secret: bool = False
 
 
+class WatchStatusCard(ttk.Frame):
+    def __init__(self, parent: tk.Misc, title: str, value: tk.StringVar, caption: tk.StringVar) -> None:
+        super().__init__(parent, style="StatusCard.TFrame", padding=token("layout", "card_pad"))
+        self.configure(height=token("component", "status_card_min_h"))
+        self.grid_propagate(False)
+        self.columnconfigure(0, weight=1)
+        ttk.Label(self, text=title, style="StatusCaption.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(self, textvariable=value, style="StatusValue.TLabel").grid(row=1, column=0, sticky="w", pady=(space("sm"), 0))
+        ttk.Label(self, textvariable=caption, style="StatusCaption.TLabel").grid(row=2, column=0, sticky="w", pady=(space("sm"), 0))
+
+
+class OCREventTable(ttk.Frame):
+    def __init__(self, parent: tk.Misc, palette: dict[str, str]) -> None:
+        super().__init__(parent, style="Card.TFrame")
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        columns = ("time", "kind", "seat", "telegram", "evidence")
+        self.tree = ttk.Treeview(self, columns=columns, show="headings", style="Event.Treeview", height=token("table", "event_height"))
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        for col, label, width in [
+            ("time", "시간", 96),
+            ("kind", "이벤트", 108),
+            ("seat", "좌석", 70),
+            ("telegram", "알림", 82),
+            ("evidence", "OCR 근거", 520),
+        ]:
+            self.tree.heading(col, text=label, anchor="w")
+            self.tree.column(col, width=width, minwidth=width, anchor="w", stretch=col == "evidence")
+        self.tree.tag_configure("odd", background=palette["table_odd"])
+        self.tree.tag_configure("even", background=palette["table_even"])
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+    def add_event(self, kind: str, seat: str, telegram: str, evidence: str) -> None:
+        now = time.strftime("%H:%M:%S")
+        tag = "even" if len(self.tree.get_children()) % 2 == 0 else "odd"
+        self.tree.insert("", 0, values=(now, kind, seat, telegram, evidence), tags=(tag,))
+
+
+class ToastBanner(tk.Toplevel):
+    def __init__(self, parent: tk.Tk, message: str, palette: dict[str, str], danger: bool = False) -> None:
+        super().__init__(parent)
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        bg_color = palette["danger"] if danger else token("brand", "accent")
+        self.configure(bg=bg_color)
+        parent.update_idletasks()
+        width = token("toast", "width")
+        height = token("toast", "height")
+        offset = token("toast", "offset")
+        x = parent.winfo_rootx() + max(0, parent.winfo_width() - width - offset)
+        y = parent.winfo_rooty() + offset
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        label = tk.Label(
+            self,
+            text=message,
+            bg=bg_color,
+            fg=token("brand", "on_accent"),
+            font=token("typography", "body_bold"),
+            padx=token("toast", "pad"),
+            pady=token("toast", "pad"),
+            anchor="w",
+            justify="left",
+        )
+        label.pack(fill="both", expand=True)
+        self.after(token("toast", "duration_ms"), self.destroy)
+
+
 class WatcherGui(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -273,6 +383,9 @@ class WatcherGui(tk.Tk):
         self.hit_metric_var = tk.StringVar(value="0")
         self.telegram_metric_var = tk.StringVar(value="0")
         self.summary_var = tk.StringVar(value="초기 설정을 완료하고 감시를 시작하세요.")
+        self.scan_caption_var = tk.StringVar(value="아직 스캔 전")
+        self.hit_caption_var = tk.StringVar(value="잔여좌석 후보 없음")
+        self.telegram_caption_var = tk.StringVar(value="알림 대기")
 
         self.palette: dict[str, str] = {}
         self._apply_palette()
@@ -335,16 +448,13 @@ class WatcherGui(tk.Tk):
         kpis.grid(row=1, column=0, sticky="ew", pady=(0, 18))
         for col in range(3):
             kpis.columnconfigure(col, weight=1)
-        self._metric_card(kpis, 0, "OCR scans", self.scan_metric_var, "팝업 스캔 누적")
-        self._metric_card(kpis, 1, "Seat signals", self.hit_metric_var, "잔여좌석 후보 감지")
-        self._metric_card(kpis, 2, "Telegram sent", self.telegram_metric_var, "휴대폰 알림 전송")
+        self._metric_card(kpis, 0, "OCR scans", self.scan_metric_var, self.scan_caption_var)
+        self._metric_card(kpis, 1, "Seat signals", self.hit_metric_var, self.hit_caption_var)
+        self._metric_card(kpis, 2, "Telegram sent", self.telegram_metric_var, self.telegram_caption_var)
 
-    def _metric_card(self, parent: ttk.Frame, col: int, title: str, value: tk.StringVar, helper: str) -> None:
-        card = ttk.Frame(parent, style="Card.TFrame", padding=token("layout", "card_pad"))
+    def _metric_card(self, parent: ttk.Frame, col: int, title: str, value: tk.StringVar, caption: tk.StringVar) -> None:
+        card = WatchStatusCard(parent, title, value, caption)
         card.grid(row=0, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0 if col == 2 else 8))
-        ttk.Label(card, text=title, style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(card, textvariable=value, style="Metric.TLabel").grid(row=1, column=0, sticky="w", pady=(8, 2))
-        ttk.Label(card, text=helper, style="CardMuted.TLabel").grid(row=2, column=0, sticky="w")
 
     def _build_chart(self, parent: ttk.Frame) -> None:
         panel = ttk.Frame(parent, style="Card.TFrame", padding=token("layout", "card_pad"))
@@ -382,14 +492,17 @@ class WatcherGui(tk.Tk):
         logs.grid(row=0, column=1, sticky="nsew")
         logs.columnconfigure(0, weight=1)
         logs.rowconfigure(2, weight=1)
+        logs.rowconfigure(3, weight=1)
         log_header = ttk.Frame(logs, style="Card.TFrame")
         log_header.grid(row=0, column=0, sticky="ew")
         log_header.columnconfigure(0, weight=1)
-        ttk.Label(log_header, text="실시간 로그", style="Section.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(log_header, text="OCR 이벤트 검증", style="Section.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Button(log_header, text="명령 복사", style="Secondary.TButton", command=self._copy_command).grid(row=0, column=1, sticky="e")
         ttk.Entry(logs, textvariable=self.command_var, state="readonly").grid(row=1, column=0, sticky="ew", pady=(12, 12))
+        self.event_table = OCREventTable(logs, self.palette)
+        self.event_table.grid(row=2, column=0, sticky="nsew", pady=(0, 12))
         self.output_text = tk.Text(logs, wrap="word", height=token("layout", "log_height"), font=token("typography", "log"), bg=self.palette["log_bg"], fg=self.palette["log_fg"], insertbackground=self.palette["log_fg"], relief=token("effects", "relief_flat"), padx=14, pady=14)
-        self.output_text.grid(row=2, column=0, sticky="nsew")
+        self.output_text.grid(row=3, column=0, sticky="nsew")
 
     def _toggle_theme(self) -> None:
         self._apply_palette()
@@ -487,6 +600,54 @@ class WatcherGui(tk.Tk):
         self._refresh_summary()
         self._draw_chart()
 
+    def _show_toast(self, message: str, danger: bool = False) -> None:
+        ToastBanner(self, message, self.palette, danger=danger)
+
+    def _add_event(self, kind: str, seat: str, telegram: str, evidence: str) -> None:
+        if hasattr(self, "event_table"):
+            self.event_table.add_event(kind, seat, telegram, evidence)
+
+    def _parse_runtime_event(self, text: str) -> None:
+        if "팝업 OCR 확인" in text:
+            self.scan_count += 1
+            self.scan_caption_var.set(time.strftime("마지막 스캔 %H:%M:%S"))
+            self._push_chart_value(0)
+            match = re.search(r"팝업 OCR 확인:\s*(\d+)건", text)
+            if match and int(match.group(1)) > 0:
+                self._add_event("OCR 후보", match.group(1), "확인 필요", text.strip())
+
+        seat_match = re.search(r"OCR No\.(\d+)\s+잔여좌석\s+(\d+)석\s+-\s+(.+)", text)
+        if seat_match:
+            no, seats, evidence = seat_match.groups()
+            self._add_event(f"No.{no}", f"{seats}석", "전송 대기", evidence.strip())
+            self.hit_caption_var.set(f"No.{no} / {seats}석 후보")
+            self._show_toast(f"ADsP 잔여좌석 후보 감지\nNo.{no} / {seats}석")
+
+        seat_column_match = re.search(r"OCR seat column page\s+(\d+)\s+잔여좌석\s+(\d+)석\s+-\s+(.+)", text)
+        if seat_column_match:
+            page, seats, evidence = seat_column_match.groups()
+            self._add_event(f"좌석열 p{page}", f"{seats}석", "보조 OCR", evidence.strip())
+
+        if "ADsP 잔여좌석 발견" in text:
+            self.hit_count += 1
+            self._push_chart_value(1)
+
+        if "Telegram 알림 전송 완료" in text:
+            self.telegram_count += 1
+            self.telegram_caption_var.set(time.strftime("마지막 전송 %H:%M:%S"))
+            self._add_event("Telegram", "-", "전송 완료", text.strip())
+            self._show_toast("Telegram 알림 전송 완료")
+
+        if "Telegram 테스트 전송 완료" in text:
+            self.telegram_caption_var.set("테스트 성공")
+            self._add_event("Telegram", "-", "테스트 성공", text.strip())
+            self._show_toast("Telegram 테스트 전송 완료")
+
+        if "Telegram 알림 실패" in text or "Telegram 테스트 전송 실패" in text:
+            self.telegram_caption_var.set("전송 실패")
+            self._add_event("Telegram", "-", "실패", text.strip())
+            self._show_toast("Telegram 알림 실패", danger=True)
+
     def _build_command(self) -> list[str]:
         cmd = [sys.executable, "adsp_popup_ocr_watcher.py", "--interval", self.interval_var.get().strip() or DEFAULT_INTERVAL, "--pages", self.pages_var.get().strip() or DEFAULT_PAGES, "--scroll-method", "wheel", "--wheel-notches", self.wheel_notches_var.get().strip() or DEFAULT_WHEEL_NOTCHES, "--focus-click", self.focus_click_var.get().strip() or DEFAULT_FOCUS_CLICK, "--bbox", self.bbox_var.get().strip() or DEFAULT_BBOX, "--save-text", self.save_text_var.get().strip() or DEFAULT_SAVE_TEXT]
         if self.refresh_var.get():
@@ -512,14 +673,7 @@ class WatcherGui(tk.Tk):
     def _append_output(self, text: str) -> None:
         self.output_text.insert("end", text)
         self.output_text.see("end")
-        if "팝업 OCR 확인" in text:
-            self.scan_count += 1
-            self._push_chart_value(0)
-        if "ADsP 잔여좌석 발견" in text:
-            self.hit_count += 1
-            self._push_chart_value(1)
-        if "Telegram 알림 전송 완료" in text:
-            self.telegram_count += 1
+        self._parse_runtime_event(text)
         self._refresh_summary()
 
     def _push_chart_value(self, value: int) -> None:
