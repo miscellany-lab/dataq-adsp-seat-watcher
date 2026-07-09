@@ -1,4 +1,4 @@
-﻿# ADsP Seat Watcher
+# ADsP Seat Watcher
 
 DataQ 데이터자격검정 ADsP 고사장 목록 화면을 사용자가 직접 열어둔 상태에서, 화면 OCR 또는 클립보드 텍스트를 이용해 잔여좌석을 알려주는 Windows 로컬 보조 도구입니다.
 
@@ -99,6 +99,27 @@ winget install Python.Python.3.12
 
 이 도구는 로그인, 접수, 결제, 캡차 처리를 대신하지 않습니다.
 
+## GUI 실행
+
+명령어 옵션을 직접 조합하지 않고 하나의 창에서 설정하고 실행하려면 GUI를 사용합니다.
+
+```powershell
+python adsp_watcher_gui.py
+```
+
+GUI에서 할 수 있는 일:
+
+- DataQ 접수 페이지 열기
+- Telegram Bot token과 chat_id 입력
+- Telegram 테스트 알림 전송
+- 새로고침, 양식 재제출 확인, 절전 방지, 잔여좌석 열 보조 OCR 설정
+- OCR 영역, 잔여좌석 열 영역, 스캔 화면 수, 확인 주기 조정
+- 현재 설정으로 생성되는 CLI 명령 확인 및 복사
+- 감시 시작/중지
+- 실시간 로그 확인
+
+Bot token과 chat_id는 프로그램 실행 중 환경변수로만 전달되며, 파일에 저장하지 않습니다.
+
 ## Telegram 알림 설정
 
 1. Telegram에서 `@BotFather`에게 `/newbot`을 보내 봇을 만듭니다.
@@ -179,6 +200,7 @@ OCR은 완벽하지 않습니다. 실제 접수 가능 여부는 사용자가 Da
 
 ## 파일 구성
 
+- `adsp_watcher_gui.py`: 설정, Telegram 테스트, 실행/중지를 제공하는 GUI
 - `adsp_popup_ocr_watcher.py`: 팝업 OCR 감시, 선택적 새로고침, Telegram 알림
 - `adsp_ocr_watcher.py`: 일반 화면 OCR 감시
 - `adsp_manual_clipboard_watcher.py`: 수동 클립보드 텍스트 감시
@@ -207,4 +229,3 @@ GitHub에 올리기 전에 다음 파일이 포함되지 않게 확인하세요.
 ## 윤리적 사용
 
 이 도구는 취소표나 추가 증설 좌석을 사람이 직접 확인하기 위한 알림 보조 도구입니다. 과도한 요청 주기, 자동 접수, 자동 결제, 로그인 자동화, 캡차 우회, 사이트 보호 우회 용도로 사용하지 마세요.
-
