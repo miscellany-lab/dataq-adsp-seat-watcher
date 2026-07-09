@@ -35,7 +35,7 @@ def alert(message: str) -> None:
         pass
 
     try:
-        ctypes.windll.user32.MessageBoxW(None, message, "ADsP 잔여좌석 알림", 0x40)
+        ctypes.windll.user32.MessageBoxW(None, message, "DataQ 잔여좌석 알림", 0x40)
     except Exception:
         pass
 
@@ -80,7 +80,7 @@ def main() -> int:
                 ]
                 alert_key = "\n".join(lines)
                 if alert_key != last_alert_key:
-                    alert("ADsP 잔여좌석 발견\n\n" + "\n".join(lines[:10]))
+                    alert("DataQ 잔여좌석 발견\n\n" + "\n".join(lines[:10]))
                     last_alert_key = alert_key
             last_digest = current_digest
         else:

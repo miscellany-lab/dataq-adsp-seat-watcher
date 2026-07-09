@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 
 import adsp_popup_ocr_watcher as watcher
 from adsp_seat_parser import clipboard_rows_to_hits, parse_clipboard_rows, parse_table_like_hits
@@ -175,6 +175,18 @@ class ClipboardRegressionTest(unittest.TestCase):
     def test_ocr_path_has_no_region_exclusion(self):
         hits = parse_table_like_hits("제주도 ADsP (제주) 제주대학교 잔여좌석 : 2")
         self.assertTrue(any(hit.region == "제주도" and hit.seats == 2 for hit in hits))
+
+    def test_parser_accepts_other_dataq_exam_codes(self):
+        text = """No.\t지역\t고사장명\t주소\t엘리베이터 운영 여부\t잔여좌석\t지도
+12\t서울특별시\tSQLD (서울) 테스트고등학교\t서울 강남구 테스트로 12 테스트고등학교\t운영\t3\t보기
+"""
+        hits = clipboard_rows_to_hits(text)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].site_name, "SQLD (서울) 테스트고등학교")
+        self.assertEqual(hits[0].seats, 3)
+
+        ocr_hits = parse_table_like_hits("12 SQLD (서울) 테스트고등학교 잔여좌석 3")
+        self.assertTrue(any(hit.no == 12 and hit.seats == 3 for hit in ocr_hits))
 
 
 if __name__ == "__main__":

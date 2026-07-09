@@ -1,6 +1,6 @@
-# README Image Assets
+﻿# README Image Assets
 
-Place the validation screenshots used by the main README in this directory.
+Place validation screenshots used by the main README in this directory.
 
 Expected files:
 

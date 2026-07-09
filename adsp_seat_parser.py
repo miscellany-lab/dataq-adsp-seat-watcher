@@ -1,10 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 
 
-TARGET_EXAM = "제50회 데이터 분석 준전문가(ADsP)"
+TARGET_EXAM = "DataQ 자격검정"
 
 REGION_KEYWORDS = [
     "서울특별시",
@@ -33,6 +33,10 @@ NUMBER_ONLY_PATTERN = re.compile(r"^\s*(\d+)\s*$")
 TABLE_ROW_SEAT_PATTERN = re.compile(r"(?:운영|미운영)\s+(\d+)\s+(?:보기|지도)?\s*$")
 OCR_ROW_PATTERN = re.compile(r"^\s*(\d{1,3})\b")
 INTEGER_PATTERN = re.compile(r"\d+")
+KNOWN_EXAM_CODE_PATTERN = re.compile(
+    r"\b(?:ADSP|ADP|SQLD|SQLP|DAP|DASP|DATAQ)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -97,7 +101,7 @@ def extract_ocr_row_hit(line: str) -> SeatHit | None:
     row_match = OCR_ROW_PATTERN.match(line)
     if not row_match:
         return None
-    if "ADSP" not in line.upper():
+    if not KNOWN_EXAM_CODE_PATTERN.search(line):
         return None
 
     row_number = int(row_match.group(1))
@@ -167,7 +171,11 @@ def _row_from_flat_line(line: str) -> ClipboardSeatRow | None:
         return None
     seats = extract_seat_count(line)
     site_name = ""
-    site_match = re.search(r"(ADsP\s*\([^)]*\)\s*.+?)(?:\s{2,}|\s+[가-힣]+[시군구]\s)", line)
+    site_match = re.search(
+        r"((?:ADsP|ADP|SQLD|SQLP|DAP|DAsP)\s*\([^)]*\)\s*.+?)(?:\s{2,}|\s+[가-힣]+[시군구]\s)",
+        line,
+        re.IGNORECASE,
+    )
     if site_match:
         site_name = site_match.group(1).strip()
     return ClipboardSeatRow(no=no, region=region, site_name=site_name, address="", seats=seats, line=line)

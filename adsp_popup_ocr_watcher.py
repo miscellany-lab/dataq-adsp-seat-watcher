@@ -198,7 +198,7 @@ def alert(message: str, show_message_box: bool = False) -> None:
     if show_message_box:
         def show_message() -> None:
             try:
-                ctypes.windll.user32.MessageBoxW(None, message, "ADsP 잔여좌석 알림", 0x40)
+                ctypes.windll.user32.MessageBoxW(None, message, "DataQ 잔여좌석 알림", 0x40)
             except Exception:
                 pass
 
@@ -418,7 +418,7 @@ def main() -> int:
     parser.add_argument("--lang", default=DEFAULT_LANG, help=f"OCR 언어. 기본값: {DEFAULT_LANG}")
     parser.add_argument("--tesseract", default=None, help="tesseract.exe 경로")
     parser.add_argument("--save-text", default=None, help="마지막 OCR 텍스트 저장 파일")
-    parser.add_argument("--log-file", default="adsp_popup_hits.log", help="알림 로그 파일")
+    parser.add_argument("--log-file", default="dataq_popup_hits.log", help="알림 로그 파일")
     parser.add_argument("--keep-awake", action="store_true", help="실행 중 Windows 절전/화면 꺼짐을 방지합니다.")
     parser.add_argument(
         "--confirm-resubmit",
@@ -466,7 +466,7 @@ def main() -> int:
     print(f"Telegram 알림: {'사용' if telegram_ready else '미설정'}")
     if args.telegram_test:
         test_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        send_telegram(args.telegram_token, args.telegram_chat_id, f"ADsP watcher Telegram test\n시간: {test_now}")
+        send_telegram(args.telegram_token, args.telegram_chat_id, f"DataQ Seat Watcher Telegram test\n시간: {test_now}")
 
     last_alert_key = ""
 
@@ -478,7 +478,7 @@ def main() -> int:
         alert_key = "\n".join(lines)
         if alert_key == last_alert_key:
             return
-        message = f"ADsP 잔여좌석 발견 ({len(found_hits)}건)\n\n" + "\n\n".join(lines)
+        message = f"DataQ 잔여좌석 발견 ({len(found_hits)}건)\n\n" + "\n\n".join(lines)
         append_log(args.log_file, f"[{event_time}]\n{message}\n")
         if args.gui_events:
             payload = {

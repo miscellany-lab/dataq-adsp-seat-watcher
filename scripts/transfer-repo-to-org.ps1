@@ -1,5 +1,5 @@
 param(
-    [string]$Repository = "unknownboy-creator/dataq-adsp-seat-watcher",
+    [string]$Repository = "unknownboy-creator/dataq-seat-watcher",
     [string]$Organization = "miscellany-lab",
     [string]$RemoteName = "origin"
 )

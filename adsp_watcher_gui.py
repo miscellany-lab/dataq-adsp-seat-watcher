@@ -27,7 +27,7 @@ from adsp_popup_ocr_watcher import DEFAULT_FOCUS_CLICK, DEFAULT_SEAT_BBOX, send_
 from adsp_seat_parser import TARGET_EXAM
 
 
-APP_TITLE = "ADsP Seat Watcher"
+APP_TITLE = "DataQ Seat Watcher"
 BASE_DIR = Path(__file__).resolve().parent
 THEME_PATH = BASE_DIR / "themes" / "adsp_customtkinter_theme.json"
 DATAQ_ACCEPT_URL = "https://www.dataq.or.kr/www/accept/list.do"
@@ -283,7 +283,7 @@ class WatcherGui(ctk.CTk):
         panel.grid(row=0, column=0, sticky="", padx=space("xxl"), pady=space("xxl"))
         panel.grid_columnconfigure(0, weight=1)
         pad = token("layout", "card_pad")
-        ctk.CTkLabel(panel, text="ADsP Seat Watcher", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
+        ctk.CTkLabel(panel, text="DataQ Seat Watcher", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
         ctk.CTkLabel(
             panel,
             text="처음 실행하는 사용자를 위해 휴대폰 알림, DataQ 화면 준비, 감시 방식 확인을 한 단계씩 안내합니다.",
@@ -346,7 +346,7 @@ class WatcherGui(ctk.CTk):
         ctk.CTkLabel(panel, text="실제 접수와 결제는 DataQ 화면에서 사용자가 직접 진행합니다.", font=font("caption"), text_color=self.palette["muted"], justify="left", wraplength=780).grid(row=3, column=0, sticky="w", padx=pad, pady=(space("xxl"), pad))
     def _build_sidebar(self, parent: ctk.CTkFrame) -> None:
         pad = token("layout", "sidebar_pad")
-        ctk.CTkLabel(parent, text="ADsP", font=font("sidebar_title", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
+        ctk.CTkLabel(parent, text="DataQ", font=font("sidebar_title", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
         ctk.CTkLabel(parent, text="Seat Watcher", font=font("caption"), text_color=self.palette["muted"]).grid(row=1, column=0, sticky="w", padx=pad, pady=(space("xs"), space("xxl")))
         actions = [
             ("시작 준비", self._open_setup_wizard),
@@ -364,7 +364,7 @@ class WatcherGui(ctk.CTk):
         hero.grid(row=0, column=0, sticky="ew", pady=(0, space("xl")))
         hero.grid_propagate(False)
         hero.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(hero, text="ADsP 잔여좌석 알림 도우미", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(token("layout", "card_pad"), 0))
+        ctk.CTkLabel(hero, text="DataQ 잔여좌석 알림 도우미", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(token("layout", "card_pad"), 0))
         ctk.CTkLabel(hero, text=f"{TARGET_EXAM} 고사장 팝업을 직접 열어두면 화면에 보이는 잔여좌석을 읽고 휴대폰으로 알려줍니다.", font=font("body"), text_color=self.palette["muted"], justify="left", wraplength=720).grid(row=1, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(space("md"), 0))
         self.status_badge = ctk.CTkLabel(hero, textvariable=self.status_var, fg_color=self.palette["status_bg"], text_color=self.palette["status_fg"], corner_radius=999, font=font("caption", "bold"), width=78, height=32)
         self.status_badge.grid(row=0, column=1, sticky="ne", padx=token("layout", "card_pad"), pady=token("layout", "card_pad"))
@@ -508,7 +508,7 @@ class WatcherGui(ctk.CTk):
 
     def _browser_step(self, parent: ctk.CTkFrame) -> None:
         pad = token("layout", "modal_card_pad")
-        for row, text in enumerate(["DataQ 접수 화면을 엽니다.", "사용자가 직접 로그인합니다.", "ADsP 고사장 목록 팝업을 열고 고사장 목록 팝업을 화면 맨 앞으로 둡니다."]):
+        for row, text in enumerate(["DataQ 접수 화면을 엽니다.", "사용자가 직접 로그인합니다.", "응시할 자격검정 고사장 목록 팝업을 열고 고사장 목록 팝업을 화면 맨 앞으로 둡니다."]):
             ctk.CTkLabel(parent, text=f"{row + 1}. {text}", font=font("body"), text_color=self.palette["text"]).grid(row=row, column=0, sticky="w", padx=pad, pady=(pad if row == 0 else space("sm"), 0))
         ctk.CTkButton(parent, text="DataQ 접수 화면 열기", command=lambda: webbrowser.open(DATAQ_ACCEPT_URL)).grid(row=3, column=0, sticky="ew", padx=pad, pady=(space("xl"), space("lg")))
         self._field(parent, 4, FieldSpec("포커스 클릭 좌표", self.focus_click_var, "기본값 900,500. 스크롤이 움직이지 않을 때만 조정하세요."))
@@ -623,7 +623,7 @@ class WatcherGui(ctk.CTk):
 
     def _send_test_telegram(self, token_value: str, chat_id: str) -> None:
         try:
-            ok = send_telegram(token_value, chat_id, "ADsP Seat Watcher 테스트 알림입니다.")
+            ok = send_telegram(token_value, chat_id, "DataQ Seat Watcher 테스트 알림입니다.")
         except Exception as exc:  # pragma: no cover - network dependent
             self.output_queue.put(("telegram_error", f"Telegram 테스트 실패: {exc}\n"))
             return

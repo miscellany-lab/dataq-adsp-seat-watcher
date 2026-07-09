@@ -1,4 +1,4 @@
-"""CSS-based desktop shell for the ADsP seat watcher.
+"""CSS-based desktop shell for the DataQ seat watcher.
 
 This app keeps the proven watcher engine in Python and moves the general-user
 experience to a small HTML/CSS interface rendered by pywebview.
@@ -81,7 +81,7 @@ class WatcherApi:
             return {"ok": False, "message": "Bot token과 Chat ID를 모두 입력해야 테스트할 수 있습니다."}
         try:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            send_telegram(cfg.telegram_token, cfg.telegram_chat_id, f"ADsP Seat Watcher 테스트 알림\n시간: {now}")
+            send_telegram(cfg.telegram_token, cfg.telegram_chat_id, f"DataQ Seat Watcher 테스트 알림\n시간: {now}")
         except Exception as exc:  # pragma: no cover - network/runtime path
             return {"ok": False, "message": f"Telegram 전송 실패: {exc}"}
         return {"ok": True, "message": "휴대폰으로 테스트 알림을 보냈습니다."}
@@ -285,7 +285,7 @@ class WatcherApi:
             "address": address,
         }
     def _consume_result_line(self, line: str) -> None:
-        if line.startswith("ADsP 잔여좌석 발견"):
+        if line.startswith("DataQ 잔여좌석 발견") or line.startswith("ADsP 잔여좌석 발견"):
             self._flush_pending_result()
             return
 
@@ -375,7 +375,7 @@ def main() -> int:
     index = UI_DIR / "index.html"
     api = WatcherApi()
     webview.create_window(
-        "ADsP Seat Watcher",
+        "DataQ Seat Watcher",
         str(index),
         js_api=api,
         width=1180,
