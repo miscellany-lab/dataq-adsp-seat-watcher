@@ -38,17 +38,17 @@
       <div class="screen-grid">
         <div class="copy">
           <span class="pill">자동 접수 아님</span>
-          <h3>휴대폰 알림까지 한 번에 준비할게요.</h3>
+          <h3>잔여좌석 확인을 보기 쉽게 정리합니다.</h3>
           <p>
-            이 앱은 사용자가 직접 열어둔 DataQ 고사장 팝업을 읽고, 잔여좌석이 생긴 행만 정리해서 알려줍니다.
-            복잡한 OCR 설정은 기본값으로 감추고, 필요한 검증만 단계별로 진행합니다.
+            사용자가 직접 열어둔 DataQ 고사장 팝업을 읽고, 잔여좌석이 생긴 행만 화면에 정리합니다.
+            Telegram은 선택 사항이며, 연결하지 않아도 감시와 결과 확인은 가능합니다.
           </p>
         </div>
         <div class="checklist">
-          <div><b>1</b><span>Telegram 알림 연결</span></div>
+          <div><b>1</b><span>선택 알림 설정</span></div>
           <div><b>2</b><span>DataQ 팝업 준비</span></div>
           <div><b>3</b><span>감시 설정 확인</span></div>
-          <div><b>4</b><span>실행 화면으로 이동</span></div>
+          <div><b>4</b><span>결과 화면에서 실행</span></div>
         </div>
       </div>
       <div class="actions">
@@ -59,25 +59,26 @@
     <template id="telegramScreen">
       <div class="form-stack">
         <div class="copy compact">
-          <span class="pill">휴대폰 알림</span>
-          <h3>Telegram 봇 정보를 입력하세요.</h3>
-          <p>토큰과 Chat ID는 저장하지 않고, 실행 중인 프로세스 환경변수로만 전달합니다.</p>
+          <span class="pill">선택 사항</span>
+          <h3>휴대폰 알림이 필요하면 Telegram을 연결하세요.</h3>
+          <p>입력하지 않고 넘어가도 됩니다. 토큰과 Chat ID는 저장하지 않고, 실행 중인 프로세스 환경변수로만 전달합니다.</p>
         </div>
         <label class="field">
           <span>Bot token</span>
-          <input id="telegramToken" type="password" autocomplete="off" placeholder="1234567890:ABC..." />
+          <input id="telegramToken" type="password" autocomplete="off" placeholder="예: 1234567890:ABC..." />
         </label>
         <label class="field">
           <span>Chat ID</span>
-          <input id="telegramChatId" type="text" inputmode="numeric" placeholder="8769334715" />
+          <input id="telegramChatId" type="text" inputmode="numeric" placeholder="예: 123456789" />
         </label>
         <div class="inline-actions">
           <button class="secondary" id="telegramTest" type="button">테스트 전송</button>
-          <span class="hint" id="telegramHint">테스트 성공 후 다음 단계로 이동하세요.</span>
+          <span class="hint" id="telegramHint">알림을 쓰지 않을 거라면 바로 다음으로 넘어가세요.</span>
         </div>
       </div>
       <div class="actions">
         <button class="ghost" data-prev>이전</button>
+        <button class="ghost" data-next>건너뛰기</button>
         <button class="primary" data-next>다음</button>
       </div>
     </template>
@@ -133,7 +134,7 @@
           <div>
             <span class="pill" id="runBadge">대기 중</span>
             <h3>팝업을 맨 앞에 둔 뒤 감시를 시작하세요.</h3>
-            <p>잔여좌석이 감지되면 행 번호, 지역, 고사장명, 주소를 정리해서 Telegram으로 보냅니다.</p>
+            <p>잔여좌석이 감지되면 이 화면에 결과가 쌓입니다. Telegram을 연결했다면 같은 내용이 휴대폰으로도 전송됩니다.</p>
           </div>
           <div class="run-actions">
             <button class="primary" id="startWatcher" type="button">감시 시작</button>
@@ -143,14 +144,14 @@
         <section class="metrics">
           <article><span>상태</span><strong id="metricState">대기</strong></article>
           <article><span>시작 시간</span><strong id="metricStarted">-</strong></article>
-          <article><span>최근 이벤트</span><strong id="metricEvent">-</strong></article>
+          <article><span>감지 결과</span><strong id="metricResultCount">0건</strong></article>
         </section>
-        <section class="event-card">
+        <section class="result-card">
           <div class="event-head">
-            <h3>최근 활동</h3>
+            <h3>잔여좌석 결과</h3>
             <button class="ghost small" id="copyLog" type="button">로그 복사</button>
           </div>
-          <div id="eventList" class="event-list"></div>
+          <div id="resultList" class="result-list"></div>
         </section>
       </div>
       <div class="actions">

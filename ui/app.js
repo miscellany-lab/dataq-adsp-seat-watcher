@@ -1,6 +1,6 @@
 ﻿const steps = [
   { key: 'welcome', title: '처음 설정', template: 'welcomeScreen' },
-  { key: 'telegram', title: 'Telegram 연결', template: 'telegramScreen' },
+  { key: 'telegram', title: '선택 알림 설정', template: 'telegramScreen' },
   { key: 'browser', title: 'DataQ 팝업 준비', template: 'browserScreen' },
   { key: 'settings', title: '감시 설정', template: 'settingsScreen' },
   { key: 'run', title: '실행', template: 'runScreen' },
@@ -12,6 +12,7 @@ const state = {
   telegramOk: false,
   log: '',
   events: [],
+  results: [],
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -55,10 +56,6 @@ function wireScreen(key) {
   document.querySelectorAll('[data-next]').forEach((button) => {
     button.addEventListener('click', () => {
       collectFields();
-      if (key === 'telegram' && (!state.config.telegram_token || !state.config.telegram_chat_id)) {
-        toast('Telegram 정보를 입력하세요.');
-        return;
-      }
       state.index = Math.min(state.index + 1, steps.length - 1);
       render();
     });
@@ -96,7 +93,7 @@ function wireScreen(key) {
       await navigator.clipboard.writeText(state.log || '');
       toast('로그를 클립보드에 복사했습니다.');
     });
-    renderEvents();
+    renderResults();
   }
 }
 
@@ -128,8 +125,8 @@ function hydrateFields() {
 
 function collectFields() {
   const values = {
-    telegram_token: $('#telegramToken')?.value ?? state.config.telegram_token,
-    telegram_chat_id: $('#telegramChatId')?.value ?? state.config.telegram_chat_id,
+    telegram_token: $('#telegramToken')?.value?.trim() ?? state.config.telegram_token,
+    telegram_chat_id: $('#telegramChatId')?.value?.trim() ?? state.config.telegram_chat_id,
     interval: Number($('#interval')?.value ?? state.config.interval),
     pages: Number($('#pages')?.value ?? state.config.pages),
     wheel_notches: Number($('#wheelNotches')?.value ?? state.config.wheel_notches),
@@ -168,21 +165,32 @@ function setRunning(running) {
   $('#metricState').textContent = running ? '실행 중' : '대기';
 }
 
-function renderEvents() {
-  const list = $('#eventList');
+function renderResults() {
+  const list = $('#resultList');
   if (!list) return;
   list.innerHTML = '';
-  if (state.events.length === 0) {
+  if ($('#metricResultCount')) $('#metricResultCount').textContent = `${state.results.length}건`;
+
+  if (state.results.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'event-item';
-    empty.innerHTML = '<strong>대기</strong><span>-</span><span>아직 이벤트가 없습니다.</span>';
+    empty.className = 'empty-result';
+    empty.innerHTML = '<strong>아직 감지된 잔여좌석이 없습니다.</strong><span>감시가 진행되면 고사장명, 지역, 좌석 수가 이곳에 정리됩니다.</span>';
     list.appendChild(empty);
     return;
   }
-  state.events.slice(-80).reverse().forEach((event) => {
-    const item = document.createElement('div');
-    item.className = `event-item ${event.kind === 'hit' ? 'hit' : ''}`;
-    item.innerHTML = `<strong>${event.time}</strong><span>${event.kind}</span><span>${escapeHtml(event.message)}</span>`;
+
+  state.results.slice().reverse().forEach((result) => {
+    const item = document.createElement('article');
+    item.className = 'seat-result';
+    item.innerHTML = `
+      <div class="seat-result-top">
+        <span>No.${escapeHtml(result.no)}</span>
+        <strong>${escapeHtml(result.seats)}석</strong>
+      </div>
+      <h4>${escapeHtml(result.site)}</h4>
+      <p>${escapeHtml(result.address || '주소 정보 없음')}</p>
+      <footer><span>${escapeHtml(result.region)}</span><span>${escapeHtml(result.time)}</span></footer>
+    `;
     list.appendChild(item);
   });
 }
@@ -193,11 +201,10 @@ async function poll() {
   state.log = result.log || state.log;
   state.events.push(...(result.events || []));
   state.events = state.events.slice(-120);
-  const last = state.events[state.events.length - 1];
+  state.results = result.results || state.results;
   if ($('#metricStarted')) $('#metricStarted').textContent = result.startedAt || '-';
-  if ($('#metricEvent')) $('#metricEvent').textContent = last ? last.time : '-';
   setRunning(Boolean(result.running));
-  renderEvents();
+  renderResults();
 }
 
 function toast(message) {

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import queue
+import signal
 import subprocess
 import sys
 import threading
@@ -21,7 +22,6 @@ except ImportError:  # pragma: no cover - user-facing dependency guard
     webview = None
 
 from adsp_popup_ocr_watcher import DEFAULT_FOCUS_CLICK, DEFAULT_SEAT_BBOX, send_telegram
-from adsp_seat_parser import TARGET_EXAM
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,8 +53,10 @@ class WatcherApi:
     def __init__(self) -> None:
         self.process: subprocess.Popen[str] | None = None
         self.events: queue.Queue[dict[str, str]] = queue.Queue()
+        self.results: list[dict[str, str]] = []
         self.log_lines: list[str] = []
         self.last_started_at = ""
+        self._pending_result: dict[str, str] | None = None
 
     def get_default_config(self) -> dict:
         return asdict(WatcherConfig())
@@ -66,7 +68,7 @@ class WatcherApi:
     def test_telegram(self, config: dict) -> dict:
         cfg = self._coerce_config(config)
         if not cfg.telegram_token or not cfg.telegram_chat_id:
-            return {"ok": False, "message": "Bot token과 Chat ID를 입력하세요."}
+            return {"ok": False, "message": "Bot token과 Chat ID를 모두 입력해야 테스트할 수 있습니다."}
         try:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             send_telegram(cfg.telegram_token, cfg.telegram_chat_id, f"ADsP Seat Watcher 테스트 알림\n시간: {now}")
@@ -81,11 +83,14 @@ class WatcherApi:
         cfg = self._coerce_config(config)
         command = self._build_command(cfg)
         env = os.environ.copy()
-        if cfg.telegram_token:
+        if cfg.telegram_token and cfg.telegram_chat_id:
             env["TELEGRAM_BOT_TOKEN"] = cfg.telegram_token
-        if cfg.telegram_chat_id:
             env["TELEGRAM_CHAT_ID"] = cfg.telegram_chat_id
+        else:
+            env.pop("TELEGRAM_BOT_TOKEN", None)
+            env.pop("TELEGRAM_CHAT_ID", None)
 
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         try:
             self.process = subprocess.Popen(
                 command,
@@ -97,23 +102,44 @@ class WatcherApi:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
+                creationflags=creationflags,
             )
         except Exception as exc:
             return {"ok": False, "message": f"실행 실패: {exc}"}
 
         self.last_started_at = datetime.now().strftime("%H:%M:%S")
+        self._pending_result = None
         self._emit("status", "감시를 시작했습니다.")
         threading.Thread(target=self._read_process_output, daemon=True).start()
         return {"ok": True, "message": "감시를 시작했습니다.", "command": " ".join(command)}
 
     def stop_watcher(self) -> dict:
         if not self.process or self.process.poll() is not None:
+            self.process = None
             return {"ok": True, "message": "실행 중인 감시가 없습니다."}
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=3)
-        except subprocess.TimeoutExpired:  # pragma: no cover - defensive
-            self.process.kill()
+
+        process = self.process
+        stopped = False
+        if os.name == "nt":
+            try:
+                process.send_signal(signal.CTRL_BREAK_EVENT)
+                process.wait(timeout=2)
+                stopped = True
+            except Exception:
+                stopped = False
+
+        if not stopped and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+                stopped = True
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+                stopped = True
+
+        self.process = None
+        self._pending_result = None
         self._emit("status", "감시를 중지했습니다.")
         return {"ok": True, "message": "감시를 중지했습니다."}
 
@@ -125,10 +151,13 @@ class WatcherApi:
             except queue.Empty:
                 break
         running = bool(self.process and self.process.poll() is None)
+        if self.process and not running:
+            self.process = None
         return {
             "running": running,
             "startedAt": self.last_started_at,
             "events": items,
+            "results": self.results[-120:],
             "log": "".join(self.log_lines[-500:]),
         }
 
@@ -159,7 +188,7 @@ class WatcherApi:
             cmd.append("--keep-awake")
         if cfg.message_box:
             cmd.append("--message-box")
-        if cfg.telegram_test_on_start:
+        if cfg.telegram_test_on_start and cfg.telegram_token and cfg.telegram_chat_id:
             cmd.append("--telegram-test")
         if cfg.seat_column:
             cmd.extend(["--seat-bbox", cfg.seat_bbox])
@@ -168,20 +197,25 @@ class WatcherApi:
         return cmd
 
     def _read_process_output(self) -> None:
-        assert self.process is not None
-        if self.process.stdout is None:
+        process = self.process
+        if process is None or process.stdout is None:
             return
-        for line in self.process.stdout:
+        for line in process.stdout:
             self.log_lines.append(line)
             self._classify_line(line.rstrip())
-        code = self.process.poll()
+        self._flush_pending_result()
+        code = process.poll()
         self._emit("status", f"감시 프로세스가 종료되었습니다. code={code}")
 
     def _classify_line(self, line: str) -> None:
         if not line:
             return
+        self._consume_result_line(line)
+
         kind = "log"
-        if "잔여좌석 발견" in line or ("No." in line and "석" in line):
+        if "잔여좌석 발견" in line:
+            kind = "summary"
+        elif line.startswith("No.") and "|" in line and "석" in line:
             kind = "hit"
         elif "팝업 OCR 확인" in line:
             kind = "check"
@@ -190,6 +224,45 @@ class WatcherApi:
         elif "Telegram" in line:
             kind = "telegram"
         self._emit(kind, line)
+
+    def _consume_result_line(self, line: str) -> None:
+        if line.startswith("ADsP 잔여좌석 발견"):
+            self._flush_pending_result()
+            return
+
+        if line.startswith("No.") and "|" in line and "석" in line:
+            self._flush_pending_result()
+            parts = [part.strip() for part in line.split("|")]
+            if len(parts) >= 3:
+                self._pending_result = {
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "no": parts[0].replace("No.", "").strip(),
+                    "region": parts[1],
+                    "seats": parts[2].replace("석", "").strip(),
+                    "site": "",
+                    "address": "",
+                }
+            return
+
+        if self._pending_result is None:
+            return
+        if not self._pending_result["site"]:
+            self._pending_result["site"] = line
+            return
+        if not self._pending_result["address"]:
+            self._pending_result["address"] = line
+            self._flush_pending_result()
+
+    def _flush_pending_result(self) -> None:
+        if self._pending_result is None:
+            return
+        result = self._pending_result
+        self._pending_result = None
+        if not result.get("site"):
+            return
+        self.results.append(result)
+        self.results = self.results[-200:]
+        self._emit("result", f"No.{result['no']} {result['region']} {result['seats']}석")
 
     def _emit(self, kind: str, message: str) -> None:
         self.events.put({"kind": kind, "message": message, "time": datetime.now().strftime("%H:%M:%S")})

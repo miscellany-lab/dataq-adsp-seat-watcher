@@ -265,7 +265,7 @@ python adsp_desktop_app.py
 화면 흐름:
 
 1. 처음 설정 안내
-2. Telegram Bot token / Chat ID 입력 및 테스트 전송
+2. 선택 사항: Telegram Bot token / Chat ID 입력 및 테스트 전송
 3. DataQ 팝업 준비 안내
 4. 권장 감시값 확인
 5. 감시 시작/중지와 최근 이벤트 확인

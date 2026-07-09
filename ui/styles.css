@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: light;
   --accent: #0052ff;
   --accent-hover: #0046d8;
@@ -357,7 +357,7 @@ button:disabled {
 
 .metrics strong { font-size: 22px; }
 
-.event-card {
+.result-card {
   min-height: 250px;
   padding: 22px;
   border-radius: var(--radius-lg);
@@ -371,30 +371,6 @@ button:disabled {
   margin-bottom: 14px;
 }
 
-.event-list {
-  display: grid;
-  gap: 10px;
-  max-height: 250px;
-  overflow: auto;
-}
-
-.event-item {
-  display: grid;
-  grid-template-columns: 72px 90px minmax(0, 1fr);
-  gap: 10px;
-  padding: 13px 14px;
-  border-radius: 14px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.event-item strong { color: var(--text); }
-
-.event-item.hit {
-  border: 1px solid rgba(0, 168, 120, .35);
-  background: rgba(0, 168, 120, .08);
-}
 
 .toast {
   position: fixed;
@@ -415,4 +391,80 @@ button:disabled {
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+.result-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.empty-result {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  min-height: 170px;
+  place-content: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-result strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.seat-result {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid rgba(0, 82, 255, .16);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.seat-result-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.seat-result-top span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.seat-result-top strong {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 168, 120, .12);
+  color: var(--success);
+  font-size: 14px;
+}
+
+.seat-result h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.seat-result p {
+  min-height: 42px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.seat-result footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
