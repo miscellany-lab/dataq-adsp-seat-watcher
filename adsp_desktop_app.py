@@ -1,4 +1,4 @@
-﻿"""CSS-based desktop shell for the ADsP seat watcher.
+"""CSS-based desktop shell for the ADsP seat watcher.
 
 This app keeps the proven watcher engine in Python and moves the general-user
 experience to a small HTML/CSS interface rendered by pywebview.
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import queue
+import re
 import signal
 import subprocess
 import sys
@@ -61,7 +62,7 @@ class WatcherApi:
     def get_default_config(self) -> dict:
         return asdict(WatcherConfig())
 
-    def open_dataq(self) -> dict:
+    def open_dataq(self, _payload: dict | None = None) -> dict:
         webbrowser.open(DATAQ_ACCEPT_URL)
         return {"ok": True, "message": "DataQ 접수 화면을 열었습니다."}
 
@@ -113,7 +114,7 @@ class WatcherApi:
         threading.Thread(target=self._read_process_output, daemon=True).start()
         return {"ok": True, "message": "감시를 시작했습니다.", "command": " ".join(command)}
 
-    def stop_watcher(self) -> dict:
+    def stop_watcher(self, _payload: dict | None = None) -> dict:
         if not self.process or self.process.poll() is not None:
             self.process = None
             return {"ok": True, "message": "실행 중인 감시가 없습니다."}
@@ -150,6 +151,7 @@ class WatcherApi:
                 items.append(self.events.get_nowait())
             except queue.Empty:
                 break
+        self._sync_results_from_log()
         running = bool(self.process and self.process.poll() is None)
         if self.process and not running:
             self.process = None
@@ -264,6 +266,37 @@ class WatcherApi:
         self.results = self.results[-200:]
         self._emit("result", f"No.{result['no']} {result['region']} {result['seats']}석")
 
+
+    def _sync_results_from_log(self) -> None:
+        text = "".join(self.log_lines)
+        if not text:
+            return
+        pattern = re.compile(
+            r"^No\.(?P<no>\d+)\s*\|\s*(?P<region>[^|]+)\|\s*(?P<seats>\d+)석\s*\n"
+            r"(?P<site>[^\n]+)\n"
+            r"(?P<address>[^\n]+)",
+            re.MULTILINE,
+        )
+        known = {
+            (item.get("no"), item.get("seats"), item.get("site"), item.get("address"))
+            for item in self.results
+        }
+        for match in pattern.finditer(text):
+            item = {
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "no": match.group("no").strip(),
+                "region": match.group("region").strip(),
+                "seats": match.group("seats").strip(),
+                "site": match.group("site").strip(),
+                "address": match.group("address").strip(),
+            }
+            key = (item["no"], item["seats"], item["site"], item["address"])
+            if key in known:
+                continue
+            known.add(key)
+            self.results.append(item)
+            self._emit("result", f"No.{item['no']} {item['region']} {item['seats']}석")
+        self.results = self.results[-200:]
     def _emit(self, kind: str, message: str) -> None:
         self.events.put({"kind": kind, "message": message, "time": datetime.now().strftime("%H:%M:%S")})
 

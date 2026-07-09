@@ -1,4 +1,4 @@
-﻿const steps = [
+const steps = [
   { key: 'welcome', title: '처음 설정', template: 'welcomeScreen' },
   { key: 'telegram', title: '선택 알림 설정', template: 'telegramScreen' },
   { key: 'browser', title: 'DataQ 팝업 준비', template: 'browserScreen' },
@@ -24,6 +24,9 @@ function bridgeReady() {
 async function callApi(name, payload) {
   if (!bridgeReady()) {
     return { ok: false, message: '앱 브리지가 아직 준비되지 않았습니다.' };
+  }
+  if (payload === undefined) {
+    return window.pywebview.api[name]();
   }
   return window.pywebview.api[name](payload);
 }
