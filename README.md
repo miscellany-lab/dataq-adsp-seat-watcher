@@ -101,7 +101,7 @@ winget install Python.Python.3.12
 
 ## GUI 실행
 
-명령어 옵션을 직접 조합하지 않고, 일반 사용자용 GUI에서 준비 절차를 따라 설정한 뒤 실행하려면 GUI를 사용합니다. GUI는 CustomTkinter 기반이며, 설치 명령에서 필요한 패키지가 함께 설치됩니다.
+명령어 옵션을 직접 조합하지 않고, 일반 사용자용 GUI에서 준비 절차를 따라 설정한 뒤 실행하려면 GUI를 사용합니다. GUI는 CustomTkinter 기반이며, 처음에는 단계별 초기 설정을 안내하고 설정이 끝나면 실행 전용 화면으로 전환됩니다.
 
 ```powershell
 python adsp_watcher_gui.py
@@ -110,11 +110,12 @@ python adsp_watcher_gui.py
 GUI에서 할 수 있는 일:
 
 - 일반 사용자가 바로 이해할 수 있는 시작 준비 화면
-- Telegram 알림, DataQ 화면 준비, 감시 시작 여부를 단계별 카드로 확인
+- Telegram 알림, DataQ 화면 준비, 감시 방식, OCR 영역을 별도 창으로 순서대로 확인
 - 감시 시작/중지, Telegram 테스트, DataQ 열기를 버튼으로 실행
 - OCR 원문, 후보 테이블, CLI 명령어 같은 개발자 정보는 기본 화면에서 숨김
 - 문제가 생겼을 때만 `문제 해결 로그` 창에서 내부 로그와 실행 명령 확인
 - DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별 설정 창에서 조정
+- 활성 DataQ 팝업의 표 텍스트를 자동 복사해 OCR 알림 문구의 한글 행 정보를 보정
 - 다크모드 토글
 - CustomTkinter 기반의 모던 UI와 단계별 설정 창
 - `themes/adsp_customtkinter_theme.json`으로 관리되는 라이트/다크 테마
@@ -142,6 +143,15 @@ $env:TELEGRAM_BOT_TOKEN="봇_TOKEN"
 $env:TELEGRAM_CHAT_ID="CHAT_ID"
 ```
 
+## OCR + 클립보드 보정
+
+OCR은 좌석 숫자와 행 위치를 찾는 데 사용하고, 클립보드는 활성 DataQ 팝업에서 자동 복사한 표 텍스트의 정확한 한글 고사장 정보를 보정하는 데 사용할 수 있습니다.
+
+```powershell
+python adsp_popup_ocr_watcher.py --clipboard-assist --auto-copy-clipboard ...
+```
+
+이 기능은 접수, 로그인, 결제, 캡차 처리를 하지 않습니다. 사용자가 이미 열어둔 DataQ 고사장 팝업에서 Ctrl+A/C로 표 텍스트만 복사해 알림 문구를 더 읽기 좋게 만듭니다.
 ## 팝업 OCR 감시 실행
 
 가장 실사용에 가까운 실행 예시는 다음과 같습니다.
@@ -234,3 +244,30 @@ GitHub에 올리기 전에 다음 파일이 포함되지 않게 확인하세요.
 ## 윤리적 사용
 
 이 도구는 취소표나 추가 증설 좌석을 사람이 직접 확인하기 위한 알림 보조 도구입니다. 과도한 요청 주기, 자동 접수, 자동 결제, 로그인 자동화, 캡차 우회, 사이트 보호 우회 용도로 사용하지 마세요.
+## 새 사용자용 CSS 앱
+
+기존 `adsp_watcher_gui.py`는 CustomTkinter 기반 레거시/개발자용 GUI로 남겨두고, 일반 사용자용 화면은 `adsp_desktop_app.py`와 `ui/` 폴더의 HTML/CSS/JS로 분리했습니다.
+
+이 앱은 Toss 제품 UI에서 참고할 수 있는 단계형 설정 흐름과 명확한 실행 화면 구조를 ADsP Watcher에 맞게 재해석한 버전입니다. 공식 Toss 코드나 브랜드 자산을 복사하지 않고, 넓은 여백, 강한 파란 CTA, 차분한 상태 카드, 단계형 온보딩 같은 제품 구조만 참고했습니다.
+
+실행 전 설치:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+실행:
+
+```powershell
+python adsp_desktop_app.py
+```
+
+화면 흐름:
+
+1. 처음 설정 안내
+2. Telegram Bot token / Chat ID 입력 및 테스트 전송
+3. DataQ 팝업 준비 안내
+4. 권장 감시값 확인
+5. 감시 시작/중지와 최근 이벤트 확인
+
+보안 원칙은 동일합니다. Telegram 정보는 파일에 저장하지 않고 실행 중인 프로세스 환경변수로만 전달합니다. 자동 로그인, 자동 접수, 자동 결제, 캡차 처리, 감지 우회 기능은 포함하지 않습니다.

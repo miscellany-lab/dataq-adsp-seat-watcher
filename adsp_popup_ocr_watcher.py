@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import ImageEnhance, ImageGrab, ImageOps
 import pytesseract
 
-from adsp_seat_parser import TARGET_EXAM, SeatHit, parse_table_like_hits
+from adsp_seat_parser import TARGET_EXAM, SeatHit, clipboard_rows_to_hits, enrich_hits_with_clipboard, parse_clipboard_rows, parse_table_like_hits, seat_hit_sort_key
 
 
 DEFAULT_INTERVAL_SECONDS = 60
@@ -30,6 +30,8 @@ VK_HOME = 0x24
 VK_NEXT = 0x22
 VK_CONTROL = 0x11
 VK_RETURN = 0x0D
+VK_A = 0x41
+VK_C = 0x43
 KEYEVENTF_KEYUP = 0x0002
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
@@ -91,6 +93,12 @@ def press_key(vk: int) -> None:
     ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
 
 
+
+def press_ctrl_key(vk: int) -> None:
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    press_key(vk)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
 def press_ctrl_home() -> None:
     ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
     press_key(VK_HOME)
@@ -111,6 +119,70 @@ def click_point(point: tuple[int, int] | None) -> None:
 def scroll_wheel(notches: int) -> None:
     ctypes.windll.user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, notches * WHEEL_DELTA, 0)
 
+
+
+def read_clipboard_text() -> str:
+    try:
+        import tkinter as tk
+
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            return root.clipboard_get()
+        except tk.TclError:
+            return ""
+        finally:
+            root.destroy()
+    except Exception:
+        return ""
+
+
+def set_clipboard_text(value: str) -> None:
+    try:
+        import tkinter as tk
+
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.clipboard_clear()
+            root.clipboard_append(value)
+            root.update()
+        finally:
+            root.destroy()
+    except Exception:
+        pass
+
+
+def clear_clipboard_text() -> None:
+    set_clipboard_text("")
+
+
+def copy_active_window_text(focus_click: tuple[int, int] | None) -> str:
+    sentinel = f"__ADSP_WATCHER_CLIPBOARD_SENTINEL_{time.time_ns()}__"
+    click_point(focus_click)
+    set_clipboard_text(sentinel)
+    press_ctrl_key(VK_A)
+    time.sleep(0.08)
+    press_ctrl_key(VK_C)
+    time.sleep(0.2)
+    text = read_clipboard_text()
+    row_count = len(parse_clipboard_rows(text)) if text and text != sentinel else 0
+    if not text or text == sentinel or row_count == 0:
+        print(f"클립보드 자동 복사 실패/무효: {len(text)}자, 표 행 {row_count}개", flush=True)
+        click_point(focus_click)
+        return ""
+    print(f"클립보드 자동 복사: {len(text)}자, 표 행 {row_count}개", flush=True)
+    click_point(focus_click)
+    return text
+
+
+def format_hit_for_alert(hit: SeatHit) -> str:
+    no = f"No.{hit.no}" if hit.no is not None else hit.region
+    site = hit.site_name.strip() or hit.line.strip()
+    address = hit.address.strip()
+    if address:
+        return f"{no} | {hit.region} | {hit.seats}석\n{site}\n{address}"
+    return f"{no} | {hit.region} | {hit.seats}석\n{site}"
 
 def alert(message: str, show_message_box: bool = False) -> None:
     print(message, flush=True)
@@ -249,10 +321,12 @@ def scan_pages(
     ocr_scale: float,
     ocr_contrast: float,
     seat_bbox: tuple[int, int, int, int] | None,
-    on_page=None,
+    clipboard_provider=None,
 ) -> tuple[str, list]:
     texts: list[str] = []
-    hits = []
+    hits: list[SeatHit] = []
+    clipboard_hits: list[SeatHit] = []
+    clipboard_table_seen = False
 
     click_point(focus_click)
 
@@ -262,6 +336,7 @@ def scan_pages(
         click_point(focus_click)
 
     for page in range(max(1, pages)):
+        page_clipboard_text = clipboard_provider(page + 1) if clipboard_provider else ""
         text = screenshot_text(bbox, lang, ocr_scale, ocr_contrast)
         texts.append(text)
         page_hits = parse_table_like_hits(text)
@@ -269,10 +344,18 @@ def scan_pages(
             seat_text = screenshot_digits(seat_bbox, ocr_scale, ocr_contrast)
             texts.append(seat_text)
             page_hits.extend(parse_seat_column_hits(seat_text, page + 1))
+        if page_clipboard_text:
+            texts.append(f"[clipboard page {page + 1}]\n{page_clipboard_text}")
+            clipboard_rows = parse_clipboard_rows(page_clipboard_text)
+            if clipboard_rows:
+                clipboard_table_seen = True
+                page_clipboard_hits = clipboard_rows_to_hits(page_clipboard_text)
+                clipboard_hits.extend(page_clipboard_hits)
+                page_hits = []
+            else:
+                page_hits = [hit for hit in page_hits if not hit.region.startswith("OCR seat column page")]
+                page_hits = enrich_hits_with_clipboard(page_hits, page_clipboard_text)
         hits.extend(page_hits)
-        if on_page:
-            on_page(text, page_hits, page + 1)
-
         if page + 1 < pages:
             click_point(focus_click)
             if scroll_method == "pagedown":
@@ -286,10 +369,10 @@ def scan_pages(
         press_ctrl_home()
         time.sleep(page_wait)
 
-    unique = {(hit.region, hit.seats, hit.line): hit for hit in hits}
-    sorted_hits = sorted(unique.values(), key=lambda hit: (hit.priority, -hit.seats, hit.line))
+    final_hits = clipboard_hits if clipboard_table_seen else hits
+    unique = {(hit.region, hit.seats, hit.line): hit for hit in final_hits}
+    sorted_hits = sorted(unique.values(), key=seat_hit_sort_key)
     return "\n".join(texts), sorted_hits
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -323,6 +406,8 @@ def main() -> int:
     parser.add_argument("--bbox", type=parse_bbox, default=None, help="OCR 영역. 예: 0,110,1845,1010")
     parser.add_argument("--seat-bbox", type=parse_bbox, default=parse_bbox(DEFAULT_SEAT_BBOX), help=f"잔여좌석 열 OCR 영역. 기본값: {DEFAULT_SEAT_BBOX}")
     parser.add_argument("--disable-seat-column-check", action="store_true", help="잔여좌석 열 전용 OCR 보조 검사를 끕니다.")
+    parser.add_argument("--clipboard-assist", action="store_true", help="사용자가 복사해 둔 고사장 표 텍스트로 OCR 알림 문구의 한글 행 정보를 보정합니다.")
+    parser.add_argument("--auto-copy-clipboard", action="store_true", help="감시 주기마다 활성 DataQ 팝업에서 Ctrl+A/C로 표 텍스트를 자동 복사해 클립보드 보정에 사용합니다.")
     parser.add_argument("--message-box", action="store_true", help="알림 시 Windows 메시지박스를 띄웁니다. 기본값은 꺼짐입니다.")
     parser.add_argument("--focus-click", type=parse_point, default=parse_point(DEFAULT_FOCUS_CLICK), help=f"포커스 복구용 본문 클릭 좌표. 기본값: {DEFAULT_FOCUS_CLICK}")
     parser.add_argument("--scroll-method", choices=["wheel", "pagedown"], default="wheel", help="스크롤 방식. 기본값: wheel")
@@ -356,6 +441,9 @@ def main() -> int:
     parser.add_argument("--telegram-test", action="store_true", help="시작 시 Telegram 테스트 메시지를 1회 전송합니다.")
     args = parser.parse_args()
 
+    if args.auto_copy_clipboard:
+        args.clipboard_assist = True
+
     if not args.telegram_token:
         args.telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not args.telegram_chat_id:
@@ -371,6 +459,7 @@ def main() -> int:
     print(f"확인 주기: {args.interval}초")
     print(f"스캔 화면 수: {max(1, args.pages)}")
     print(f"OCR 영역: {args.bbox or '전체 화면'}")
+    print(f"클립보드 보정: {'자동 복사' if args.auto_copy_clipboard else ('수동 복사' if args.clipboard_assist else '사용 안 함')}")
     telegram_ready = bool(args.telegram_token and args.telegram_chat_id)
     print(f"Telegram 알림: {'사용' if telegram_ready else '미설정'}")
     if args.telegram_test:
@@ -378,26 +467,24 @@ def main() -> int:
         send_telegram(args.telegram_token, args.telegram_chat_id, f"ADsP watcher Telegram test\n시간: {test_now}")
 
     last_alert_key = ""
-    cycle_alert_sent = False
 
-    def handle_page_alerts(_page_text, page_hits, _page_number):
-        nonlocal last_alert_key, cycle_alert_sent
-        page_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        if page_hits and not cycle_alert_sent:
-            lines = [f"{hit.region} 잔여좌석 {hit.seats}석 - {hit.line}" for hit in page_hits]
-            alert_key = "\n".join(lines)
-            if alert_key != last_alert_key:
-                message = "ADsP 잔여좌석 발견\n\n" + "\n".join(lines[:10])
-                append_log(args.log_file, f"[{page_now}]\n{message}\n")
-                alert(message, args.message_box)
-                send_telegram(args.telegram_token, args.telegram_chat_id, message)
-                last_alert_key = alert_key
-            cycle_alert_sent = True
+    def send_hits_alert(found_hits: list[SeatHit], event_time: str) -> None:
+        nonlocal last_alert_key
+        if not found_hits:
+            return
+        lines = [format_hit_for_alert(hit) for hit in found_hits]
+        alert_key = "\n".join(lines)
+        if alert_key == last_alert_key:
+            return
+        message = f"ADsP 잔여좌석 발견 ({len(found_hits)}건)\n\n" + "\n\n".join(lines)
+        append_log(args.log_file, f"[{event_time}]\n{message}\n")
+        alert(message, args.message_box)
+        send_telegram(args.telegram_token, args.telegram_chat_id, message)
+        last_alert_key = alert_key
 
     while True:
-        cycle_alert_sent = False
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 
         if args.refresh:
             print(f"[{now}] 활성 창 새로고침")
@@ -421,7 +508,7 @@ def main() -> int:
                 args.ocr_scale,
                 args.ocr_contrast,
                 None if args.disable_seat_column_check else args.seat_bbox,
-                handle_page_alerts,
+                (lambda _page: copy_active_window_text(args.focus_click)) if args.auto_copy_clipboard else None,
             )
         except Exception as exc:
             print(f"[{now}] OCR 실패: {exc}")
@@ -440,7 +527,11 @@ def main() -> int:
             send_telegram(args.telegram_token, args.telegram_chat_id, message)
             return 2
 
+        if args.clipboard_assist and not args.auto_copy_clipboard:
+            hits = enrich_hits_with_clipboard(hits, read_clipboard_text())
+
         print(f"[{now}] 팝업 OCR 확인: {len(hits)}건")
+        send_hits_alert(hits, now)
 
         time.sleep(max(10, args.interval))
 

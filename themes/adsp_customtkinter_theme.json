@@ -64,7 +64,13 @@
     "scrollbar_button_color": ["#475569", "#475569"],
     "scrollbar_button_hover_color": ["#64748B", "#64748B"]
   },
-  "DropdownMenu": {
+  "CTkScrollbar": {
+    "corner_radius": 1000,
+    "border_spacing": 4,
+    "fg_color": "transparent",
+    "button_color": ["#C9D1DC", "#475569"],
+    "button_hover_color": ["#8B95A1", "#64748B"]
+  },  "DropdownMenu": {
     "fg_color": ["#FFFFFF", "#172033"],
     "hover_color": ["#EEF4FF", "#26344D"],
     "text_color": ["#191F28", "#F8FAFC"]

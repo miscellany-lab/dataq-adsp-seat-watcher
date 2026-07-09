@@ -1,0 +1,164 @@
+﻿<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ADsP Seat Watcher</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail" aria-label="설정 단계">
+        <div class="brand-mark">A</div>
+        <div>
+          <p class="eyebrow">Seat Watcher</p>
+          <h1>ADsP 알림 도우미</h1>
+        </div>
+        <nav id="steps" class="steps"></nav>
+        <div class="policy-box">
+          <strong>수동 접수 원칙</strong>
+          <span>로그인, 접수, 결제, 캡차 처리는 사용자가 직접 진행합니다.</span>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <section class="topbar">
+          <div>
+            <p class="eyebrow">제50회 데이터 분석 준전문가(ADsP)</p>
+            <h2 id="pageTitle">처음 설정</h2>
+          </div>
+          <button class="ghost" id="themeButton" type="button">다크 모드</button>
+        </section>
+
+        <section class="panel" id="screen"></section>
+      </main>
+    </div>
+
+    <template id="welcomeScreen">
+      <div class="screen-grid">
+        <div class="copy">
+          <span class="pill">자동 접수 아님</span>
+          <h3>휴대폰 알림까지 한 번에 준비할게요.</h3>
+          <p>
+            이 앱은 사용자가 직접 열어둔 DataQ 고사장 팝업을 읽고, 잔여좌석이 생긴 행만 정리해서 알려줍니다.
+            복잡한 OCR 설정은 기본값으로 감추고, 필요한 검증만 단계별로 진행합니다.
+          </p>
+        </div>
+        <div class="checklist">
+          <div><b>1</b><span>Telegram 알림 연결</span></div>
+          <div><b>2</b><span>DataQ 팝업 준비</span></div>
+          <div><b>3</b><span>감시 설정 확인</span></div>
+          <div><b>4</b><span>실행 화면으로 이동</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" data-next>시작하기</button>
+      </div>
+    </template>
+
+    <template id="telegramScreen">
+      <div class="form-stack">
+        <div class="copy compact">
+          <span class="pill">휴대폰 알림</span>
+          <h3>Telegram 봇 정보를 입력하세요.</h3>
+          <p>토큰과 Chat ID는 저장하지 않고, 실행 중인 프로세스 환경변수로만 전달합니다.</p>
+        </div>
+        <label class="field">
+          <span>Bot token</span>
+          <input id="telegramToken" type="password" autocomplete="off" placeholder="1234567890:ABC..." />
+        </label>
+        <label class="field">
+          <span>Chat ID</span>
+          <input id="telegramChatId" type="text" inputmode="numeric" placeholder="8769334715" />
+        </label>
+        <div class="inline-actions">
+          <button class="secondary" id="telegramTest" type="button">테스트 전송</button>
+          <span class="hint" id="telegramHint">테스트 성공 후 다음 단계로 이동하세요.</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" data-prev>이전</button>
+        <button class="primary" data-next>다음</button>
+      </div>
+    </template>
+
+    <template id="browserScreen">
+      <div class="copy">
+        <span class="pill">브라우저 준비</span>
+        <h3>일반 Chrome에서 DataQ 팝업을 맨 앞에 두세요.</h3>
+        <p>이 도구는 브라우저 자동 로그인을 하지 않습니다. 사용자가 접수 화면에 들어가 고사장 목록 팝업을 직접 열어둔 상태에서만 화면과 클립보드를 읽습니다.</p>
+      </div>
+      <div class="browser-steps">
+        <div><b>01</b><span>DataQ 접수 화면을 열고 직접 로그인</span></div>
+        <div><b>02</b><span>ADsP 고사장 목록 팝업을 열기</span></div>
+        <div><b>03</b><span>팝업 창을 맨 앞으로 배치</span></div>
+      </div>
+      <div class="actions split">
+        <button class="secondary" id="openDataq" type="button">DataQ 열기</button>
+        <span class="hint">새로고침 확인 창은 앱이 Enter로 넘깁니다.</span>
+      </div>
+      <div class="actions">
+        <button class="ghost" data-prev>이전</button>
+        <button class="primary" data-next>다음</button>
+      </div>
+    </template>
+
+    <template id="settingsScreen">
+      <div class="copy compact">
+        <span class="pill">권장값 적용</span>
+        <h3>일반 사용자는 기본값 그대로 두면 됩니다.</h3>
+        <p>현재 검증된 흐름은 40초 주기, 15화면 스캔, 자동 클립보드 보정입니다.</p>
+      </div>
+      <div class="settings-grid">
+        <label class="field"><span>확인 주기(초)</span><input id="interval" type="number" min="10" value="40" /></label>
+        <label class="field"><span>스캔 화면 수</span><input id="pages" type="number" min="1" value="15" /></label>
+        <label class="field"><span>휠 강도</span><input id="wheelNotches" type="number" min="1" value="9" /></label>
+        <label class="field"><span>포커스 클릭</span><input id="focusClick" value="900,500" /></label>
+      </div>
+      <div class="toggle-list">
+        <label><input id="refresh" type="checkbox" checked /> 새로고침 사용</label>
+        <label><input id="confirmResubmit" type="checkbox" checked /> 양식 다시 제출 확인 처리</label>
+        <label><input id="keepAwake" type="checkbox" checked /> 절전 방지</label>
+        <label><input id="clipboardAssist" type="checkbox" checked /> 자동 복사와 한글 보정</label>
+      </div>
+      <div class="actions">
+        <button class="ghost" data-prev>이전</button>
+        <button class="primary" data-next>실행 화면으로</button>
+      </div>
+    </template>
+
+    <template id="runScreen">
+      <div class="dashboard">
+        <section class="hero-card">
+          <div>
+            <span class="pill" id="runBadge">대기 중</span>
+            <h3>팝업을 맨 앞에 둔 뒤 감시를 시작하세요.</h3>
+            <p>잔여좌석이 감지되면 행 번호, 지역, 고사장명, 주소를 정리해서 Telegram으로 보냅니다.</p>
+          </div>
+          <div class="run-actions">
+            <button class="primary" id="startWatcher" type="button">감시 시작</button>
+            <button class="danger" id="stopWatcher" type="button" disabled>중지</button>
+          </div>
+        </section>
+        <section class="metrics">
+          <article><span>상태</span><strong id="metricState">대기</strong></article>
+          <article><span>시작 시간</span><strong id="metricStarted">-</strong></article>
+          <article><span>최근 이벤트</span><strong id="metricEvent">-</strong></article>
+        </section>
+        <section class="event-card">
+          <div class="event-head">
+            <h3>최근 활동</h3>
+            <button class="ghost small" id="copyLog" type="button">로그 복사</button>
+          </div>
+          <div id="eventList" class="event-list"></div>
+        </section>
+      </div>
+      <div class="actions">
+        <button class="ghost" data-prev>설정 수정</button>
+      </div>
+    </template>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

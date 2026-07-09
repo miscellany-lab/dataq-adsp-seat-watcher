@@ -2,3 +2,4 @@ playwright
 pillow
 pytesseract
 customtkinter
+pywebview

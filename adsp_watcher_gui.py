@@ -219,6 +219,7 @@ class WatcherGui(ctk.CTk):
         self.debug_text: ctk.CTkTextbox | None = None
         self.hit_count = 0
         self.telegram_test_ok = False
+        self.setup_completed = False
 
         self.interval_var = tk.StringVar(value=DEFAULT_INTERVAL)
         self.pages_var = tk.StringVar(value=DEFAULT_PAGES)
@@ -234,6 +235,7 @@ class WatcherGui(ctk.CTk):
         self.confirm_resubmit_var = tk.BooleanVar(value=True)
         self.keep_awake_var = tk.BooleanVar(value=True)
         self.seat_column_var = tk.BooleanVar(value=True)
+        self.clipboard_assist_var = tk.BooleanVar(value=True)
         self.telegram_test_on_start_var = tk.BooleanVar(value=False)
         self.message_box_var = tk.BooleanVar(value=False)
         self.dark_mode_var = tk.BooleanVar(value=False)
@@ -262,23 +264,86 @@ class WatcherGui(ctk.CTk):
         ctk.set_appearance_mode(mode_name(self.dark_mode_var.get()))
     def _build_ui(self) -> None:
         self.configure(fg_color=self.palette["bg"])
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
         self.grid_rowconfigure(0, weight=1)
 
-        self.sidebar = ctk.CTkFrame(self, width=token("layout", "sidebar_width"), fg_color=self.palette["sidebar"], corner_radius=0)
-        self.sidebar.grid(row=0, column=0, sticky="ns")
-        self.sidebar.grid_propagate(False)
-        self._build_sidebar(self.sidebar)
-
         self.main = ctk.CTkFrame(self, fg_color=self.palette["bg"], corner_radius=0)
-        self.main.grid(row=0, column=1, sticky="nsew", padx=token("layout", "main_pad"), pady=token("layout", "main_pad"))
+        self.main.grid(row=0, column=0, sticky="nsew", padx=token("layout", "main_pad"), pady=token("layout", "main_pad"))
         self.main.grid_columnconfigure(0, weight=1)
-        self.main.grid_rowconfigure(3, weight=1)
-        self._build_hero(self.main)
-        self._build_steps(self.main)
-        self._build_status(self.main)
-        self._build_controls(self.main)
+        if self.setup_completed:
+            self._build_runtime_view(self.main)
+        else:
+            self._build_onboarding_view(self.main)
 
+    def _build_onboarding_view(self, parent: ctk.CTkFrame) -> None:
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+        panel = ctk.CTkFrame(parent, fg_color=self.palette["surface"], corner_radius=token("component", "corner_lg"))
+        panel.grid(row=0, column=0, sticky="", padx=space("xxl"), pady=space("xxl"))
+        panel.grid_columnconfigure(0, weight=1)
+        pad = token("layout", "card_pad")
+        ctk.CTkLabel(panel, text="ADsP Seat Watcher", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
+        ctk.CTkLabel(
+            panel,
+            text="처음 실행하는 사용자를 위해 휴대폰 알림, DataQ 화면 준비, 감시 방식 확인을 한 단계씩 안내합니다.",
+            font=font("body"),
+            text_color=self.palette["muted"],
+            justify="left",
+            wraplength=560,
+        ).grid(row=1, column=0, sticky="w", padx=pad, pady=(space("md"), space("xl")))
+        ctk.CTkButton(panel, text="초기 설정 시작", command=self._open_setup_wizard, height=44).grid(row=2, column=0, sticky="ew", padx=pad, pady=(0, space("md")))
+        ctk.CTkButton(
+            panel,
+            text="이미 설정했습니다",
+            command=self._finish_setup,
+            fg_color=self.palette["surface2"],
+            hover_color=self.palette["line"],
+            text_color=token("brand", "accent"),
+            height=42,
+        ).grid(row=3, column=0, sticky="ew", padx=pad, pady=(0, space("xl")))
+        ctk.CTkLabel(
+            panel,
+            text="자동 로그인, 자동 접수, 자동 결제, 캡차 처리는 하지 않습니다.",
+            font=font("caption"),
+            text_color=self.palette["muted"],
+            justify="left",
+        ).grid(row=4, column=0, sticky="w", padx=pad, pady=(0, pad))
+
+    def _build_runtime_view(self, parent: ctk.CTkFrame) -> None:
+        parent.grid_rowconfigure(3, weight=1)
+        self._build_runtime_hero(parent)
+        self._build_status(parent)
+        self._build_runtime_controls(parent)
+
+    def _build_runtime_hero(self, parent: ctk.CTkFrame) -> None:
+        hero = ctk.CTkFrame(parent, fg_color=self.palette["surface2"], corner_radius=token("component", "corner_lg"), height=token("component", "hero_height"))
+        hero.grid(row=0, column=0, sticky="ew", pady=(0, space("xl")))
+        hero.grid_propagate(False)
+        hero.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(hero, text="감시 준비 완료", font=font("hero", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(token("layout", "card_pad"), 0))
+        ctk.CTkLabel(hero, text="DataQ 고사장 팝업을 맨 앞에 둔 뒤 감시를 시작하세요. 좌석 후보가 감지되면 휴대폰으로 알려드립니다.", font=font("body"), text_color=self.palette["muted"], justify="left", wraplength=720).grid(row=1, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(space("md"), 0))
+        self.status_badge = ctk.CTkLabel(hero, textvariable=self.status_var, fg_color=self.palette["status_bg"], text_color=self.palette["status_fg"], corner_radius=999, font=font("caption", "bold"), width=78, height=32)
+        self.status_badge.grid(row=0, column=1, sticky="ne", padx=token("layout", "card_pad"), pady=token("layout", "card_pad"))
+        ctk.CTkButton(hero, text="감시 시작", command=self._start_watcher, width=132, height=42).grid(row=2, column=0, sticky="w", padx=token("layout", "card_pad"), pady=(space("xl"), 0))
+        ctk.CTkButton(hero, text="DataQ 열기", command=lambda: webbrowser.open(DATAQ_ACCEPT_URL), fg_color=self.palette["surface"], hover_color=self.palette["line"], text_color=token("brand", "accent"), width=112, height=42).grid(row=2, column=0, sticky="w", padx=(172, 0), pady=(space("xl"), 0))
+
+    def _build_runtime_controls(self, parent: ctk.CTkFrame) -> None:
+        panel = ctk.CTkFrame(parent, fg_color=self.palette["surface"], corner_radius=token("component", "corner_lg"))
+        panel.grid(row=3, column=0, sticky="nsew")
+        panel.grid_columnconfigure(0, weight=1)
+        pad = token("layout", "card_pad")
+        ctk.CTkLabel(panel, text="실행", font=font("section", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
+        ctk.CTkLabel(panel, textvariable=self.primary_message_var, font=font("body"), text_color=self.palette["muted"], justify="left", wraplength=780).grid(row=1, column=0, sticky="w", padx=pad, pady=(space("sm"), space("xl")))
+        actions = ctk.CTkFrame(panel, fg_color="transparent")
+        actions.grid(row=2, column=0, sticky="ew", padx=pad)
+        self.start_button = ctk.CTkButton(actions, text="감시 시작", command=self._start_watcher, width=132, height=42)
+        self.start_button.grid(row=0, column=0, sticky="w")
+        self.stop_button = ctk.CTkButton(actions, text="중지", command=self._stop_watcher, fg_color=self.palette["danger"], hover_color=self.palette["danger"], state="disabled", width=92, height=42)
+        self.stop_button.grid(row=0, column=1, sticky="w", padx=(space("md"), 0))
+        ctk.CTkButton(actions, text="설정 다시 보기", command=self._open_setup_wizard, fg_color=self.palette["surface2"], hover_color=self.palette["line"], text_color=token("brand", "accent"), height=42).grid(row=0, column=2, sticky="w", padx=(space("md"), 0))
+        ctk.CTkButton(actions, text="문제 해결", command=self._open_debug_log, fg_color=self.palette["surface2"], hover_color=self.palette["line"], text_color=token("brand", "accent"), height=42).grid(row=0, column=3, sticky="w", padx=(space("md"), 0))
+        ctk.CTkLabel(panel, text="실제 접수와 결제는 DataQ 화면에서 사용자가 직접 진행합니다.", font=font("caption"), text_color=self.palette["muted"], justify="left", wraplength=780).grid(row=3, column=0, sticky="w", padx=pad, pady=(space("xxl"), pad))
     def _build_sidebar(self, parent: ctk.CTkFrame) -> None:
         pad = token("layout", "sidebar_pad")
         ctk.CTkLabel(parent, text="ADsP", font=font("sidebar_title", "bold"), text_color=self.palette["text"]).grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, 0))
@@ -382,6 +447,12 @@ class WatcherGui(ctk.CTk):
     def _open_setup_wizard(self) -> None:
         self._open_step(0)
 
+    def _finish_setup(self, show_message: bool = False) -> None:
+        self.setup_completed = True
+        self._refresh_all()
+        self._rebuild_main()
+        if show_message:
+            messagebox.showinfo("설정 완료", "설정이 완료되었습니다. 이제 감시 시작만 누르면 됩니다.")
     def _open_step(self, index: int) -> None:
         steps = [
             ("Telegram 알림", "휴대폰으로 받을 Bot token과 Chat ID를 입력합니다.", self._telegram_step),
@@ -390,9 +461,7 @@ class WatcherGui(ctk.CTk):
             ("고급 OCR", "화면 영역이 맞지 않을 때만 조정합니다.", self._ocr_step),
         ]
         if index >= len(steps):
-            self._refresh_all()
-            self._rebuild_main()
-            messagebox.showinfo("설정 완료", "설정이 완료되었습니다. 이제 감시 시작을 누르세요.")
+            self._finish_setup(show_message=True)
             return
         title, subtitle, builder = steps[index]
         window = ctk.CTkToplevel(self)
@@ -421,11 +490,17 @@ class WatcherGui(ctk.CTk):
         ctk.CTkButton(footer, text="다음" if index < len(steps) - 1 else "완료", command=lambda: self._go_step(window, index + 1)).grid(row=0, column=2, sticky="e")
 
     def _go_step(self, window: ctk.CTkToplevel, index: int) -> None:
+        if index == 1:
+            if not self._telegram_ready():
+                messagebox.showwarning("Telegram 확인", "Bot token과 Chat ID를 입력한 뒤 진행하세요.")
+                return
+            if not self.telegram_test_ok:
+                messagebox.showwarning("Telegram 확인", "테스트 전송을 완료한 뒤 진행하세요.")
+                return
         self._refresh_all()
         window.grab_release()
         window.destroy()
         self.after(80, lambda: self._open_step(index))
-
     def _telegram_step(self, parent: ctk.CTkFrame) -> None:
         self._field(parent, 0, FieldSpec("Bot token", self.token_var, "BotFather에서 받은 토큰입니다. 파일에 저장하지 않습니다.", True))
         self._field(parent, 1, FieldSpec("Chat ID", self.chat_id_var, "getUpdates 결과의 chat.id 숫자입니다."))
@@ -433,7 +508,7 @@ class WatcherGui(ctk.CTk):
 
     def _browser_step(self, parent: ctk.CTkFrame) -> None:
         pad = token("layout", "modal_card_pad")
-        for row, text in enumerate(["DataQ 접수 화면을 엽니다.", "사용자가 직접 로그인합니다.", "ADsP 고사장 목록 팝업을 열고 화면 맨 앞으로 둡니다."]):
+        for row, text in enumerate(["DataQ 접수 화면을 엽니다.", "사용자가 직접 로그인합니다.", "ADsP 고사장 목록 팝업을 열고 고사장 목록 팝업을 화면 맨 앞으로 둡니다."]):
             ctk.CTkLabel(parent, text=f"{row + 1}. {text}", font=font("body"), text_color=self.palette["text"]).grid(row=row, column=0, sticky="w", padx=pad, pady=(pad if row == 0 else space("sm"), 0))
         ctk.CTkButton(parent, text="DataQ 접수 화면 열기", command=lambda: webbrowser.open(DATAQ_ACCEPT_URL)).grid(row=3, column=0, sticky="ew", padx=pad, pady=(space("xl"), space("lg")))
         self._field(parent, 4, FieldSpec("포커스 클릭 좌표", self.focus_click_var, "기본값 900,500. 스크롤이 움직이지 않을 때만 조정하세요."))
@@ -444,7 +519,7 @@ class WatcherGui(ctk.CTk):
         self._field(parent, 2, FieldSpec("휠 칸 수", self.wheel_notches_var, "한 번에 내릴 스크롤 양입니다. 권장값은 9입니다."))
         checks = ctk.CTkFrame(parent, fg_color="transparent")
         checks.grid(row=3, column=0, sticky="ew", padx=token("layout", "modal_card_pad"), pady=(space("md"), token("layout", "modal_card_pad")))
-        for row, (label, var) in enumerate([("새로고침 사용", self.refresh_var), ("양식 다시 제출 확인 처리", self.confirm_resubmit_var), ("절전 방지", self.keep_awake_var), ("시작 시 Telegram 테스트", self.telegram_test_on_start_var), ("Windows 메시지박스 사용", self.message_box_var)]):
+        for row, (label, var) in enumerate([("새로고침 사용", self.refresh_var), ("양식 다시 제출 확인 처리", self.confirm_resubmit_var), ("절전 방지", self.keep_awake_var), ("표 자동 복사+한글 보정", self.clipboard_assist_var), ("시작 시 Telegram 테스트", self.telegram_test_on_start_var), ("Windows 메시지박스 사용", self.message_box_var)]):
             ctk.CTkCheckBox(checks, text=label, variable=var, command=self._refresh_all).grid(row=row, column=0, sticky="w", pady=space("xs"))
 
     def _ocr_step(self, parent: ctk.CTkFrame) -> None:
@@ -493,6 +568,9 @@ class WatcherGui(ctk.CTk):
             cmd.append("--telegram-test")
         if self.seat_column_var.get():
             cmd.extend(["--seat-bbox", self.seat_bbox_var.get().strip() or DEFAULT_SEAT_BBOX])
+        if self.clipboard_assist_var.get():
+            cmd.append("--clipboard-assist")
+            cmd.append("--auto-copy-clipboard")
         return cmd
 
     def _refresh_command_preview(self) -> None:
@@ -524,6 +602,10 @@ class WatcherGui(ctk.CTk):
             self.last_check_var.set(check_match.group(1).split()[-1])
             self.last_check_caption_var.set(f"감지 후보 {check_match.group(2)}건")
         seat_match = re.search(r"OCR No\.(\d+)\s+잔여좌석\s+(\d+)석", text)
+        if seat_match is None:
+            enriched_match = re.search(r"잔여좌석\s+(\d+)석\s+-\s+No\.(\d+)", text)
+            if enriched_match:
+                seat_match = re.match(r"(\d+)\|(\d+)", f"{enriched_match.group(2)}|{enriched_match.group(1)}")
         if seat_match:
             self.hit_count += 1
             self.hit_value_var.set(str(self.hit_count))
@@ -672,17 +754,13 @@ class WatcherGui(ctk.CTk):
         self._show_toast("실행 명령을 복사했습니다.")
 
     def _rebuild_main(self) -> None:
-        if hasattr(self, "main"):
-            for child in self.main.winfo_children():
-                child.destroy()
-            self._build_hero(self.main)
-            self._build_steps(self.main)
-            self._build_status(self.main)
-            self._build_controls(self.main)
-            if self._is_running():
-                self.start_button.configure(state="disabled")
-                self.stop_button.configure(state="normal")
-            self._refresh_all()
+        for child in self.winfo_children():
+            child.destroy()
+        self._build_ui()
+        if self.setup_completed and self._is_running():
+            self.start_button.configure(state="disabled")
+            self.stop_button.configure(state="normal")
+        self._refresh_all()
 
     def _on_close(self) -> None:
         if self._is_running():
