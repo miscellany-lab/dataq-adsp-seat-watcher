@@ -101,7 +101,7 @@ winget install Python.Python.3.12
 
 ## GUI 실행
 
-명령어 옵션을 직접 조합하지 않고 하나의 창에서 설정하고 실행하려면 GUI를 사용합니다.
+명령어 옵션을 직접 조합하지 않고, 단계별 설정 창에서 초기 설정을 끝낸 뒤 실행하려면 GUI를 사용합니다.
 
 ```powershell
 python adsp_watcher_gui.py
@@ -110,10 +110,9 @@ python adsp_watcher_gui.py
 GUI에서 할 수 있는 일:
 
 - DataQ 접수 페이지 열기
-- Telegram Bot token과 chat_id 입력
+- Telegram Bot token과 chat_id를 별도 설정 창에서 입력
 - Telegram 테스트 알림 전송
-- 새로고침, 양식 재제출 확인, 절전 방지, 잔여좌석 열 보조 OCR 설정
-- OCR 영역, 잔여좌석 열 영역, 스캔 화면 수, 확인 주기 조정
+- DataQ 화면 준비, 포커스 좌표, OCR 영역, 동작 옵션을 단계별로 설정
 - 현재 설정으로 생성되는 CLI 명령 확인 및 복사
 - 감시 시작/중지
 - 실시간 로그 확인
